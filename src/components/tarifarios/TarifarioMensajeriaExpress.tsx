@@ -1,0 +1,1150 @@
+import { useState, useRef, useMemo, useCallback, forwardRef, useImperativeHandle } from 'react';
+import { Card, CardHeader, CardTitle, CardContent } from '../ui/card';
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../ui/table';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
+import { Download, X, Package, Truck, RotateCcw, ChevronDown, Zap, Weight, Ruler, Plus, FileText } from 'lucide-react';
+import { Button } from '../ui/button';
+import { TEXTS } from '@/content/texts';
+import { enviarPDFporEmail, obtenerEmailUsuarioActual, blobToBase64 } from '@/utils/emailService';
+import { toast } from 'sonner@2.0.3';
+
+export interface TarifarioMensajeriaExpressHandle {
+  resetear: () => void;
+}
+
+interface TarifarioMensajeriaExpressProps {
+  isAdmin?: boolean;
+  nombreCliente?: string;
+}
+
+export const TarifarioMensajeriaExpress = forwardRef<TarifarioMensajeriaExpressHandle, TarifarioMensajeriaExpressProps>(({ isAdmin = false, nombreCliente }, ref) => {
+  // Estados iniciales para resetear
+  const getInitialState = () => ({
+    nombreCliente: '',
+    serviciosSeleccionados: [] as Array<{
+      servicio: string;
+      peso: number;
+      cantidad: number;
+      precio: number;
+    }>,
+    suplementosPeso: [] as Array<{
+      descripcion: string;
+      precio: number;
+      cantidad: number;
+    }>,
+    suplementosDimensiones: [] as Array<{
+      descripcion: string;
+      precio: number;
+      cantidad: number;
+    }>,
+    serviciosAdicionales: [] as Array<{
+      concepto: string;
+      precio: number;
+      cantidad: number;
+    }>,
+    otrosAjustes: { concepto: '', valor: '' }
+  });
+
+  // Estados
+  const [state, setState] = useState(getInitialState());
+  const [generandoPDF, setGenerandoPDF] = useState(false);
+  
+  // Estados para desplegables
+  const [catalogoAbierto, setCatalogoAbierto] = useState(true);
+  const [tarifasPesoAbierto, setTarifasPesoAbierto] = useState(true);
+  const [suplementosPesoAbierto, setSuplementosPesoAbierto] = useState(false);
+  const [suplementosDimAbierto, setSuplementosDimAbierto] = useState(false);
+  const [adicionalesAbierto, setAdicionalesAbierto] = useState(false);
+  const [condicionesAbierto, setCondicionesAbierto] = useState(false);
+  
+  const pageRef = useRef<HTMLDivElement>(null);
+
+  // Función de reseteo
+  const handleActualizar = () => {
+    setState(getInitialState());
+  };
+
+  // Exponer la función al componente padre
+  useImperativeHandle(ref, () => ({
+    resetear: handleActualizar
+  }));
+
+  // Datos - Optimizado con useMemo
+  const servicios = useMemo(() => [
+    { nombre: "19h", descripcion: "Entrega antes de las 19:00", uso: "Opción más económica del día" },
+    { nombre: "14h", descripcion: "Entrega antes de las 14:00", uso: "Económico con franja horaria" },
+    { nombre: "12h", descripcion: "Entrega antes de las 12:00", uso: "Rapidez y equilibrio" },
+    { nombre: "10h", descripcion: "Entrega antes de las 10:00", uso: "Documentos o paquetería urgente" },
+    { nombre: "08:30h", descripcion: "Entrega antes de las 08:30", uso: "Máxima urgencia" },
+    { nombre: "HOY", descripcion: "Entrega mismo día", uso: "Envíos críticos" }
+  ], []);
+
+  const tarifasPorPeso: Record<string, any> = useMemo(() => ({
+    "19h": { hasta2kg: 9.87, hasta5kg: 10.17, hasta10kg: 13.08, kgAdicional: 0.81 },
+    "14h": { hasta2kg: 14.04, hasta5kg: 15.42, hasta10kg: 24.03, kgAdicional: 1.68 },
+    "12h": { hasta2kg: 15.66, hasta5kg: 17.73, hasta10kg: 29.08, kgAdicional: 1.86 },
+    "10h": { hasta2kg: 29.59, hasta5kg: 32.63, hasta10kg: 49.00, kgAdicional: 2.62 },
+    "08:30h": { hasta2kg: 56.62, hasta5kg: 62.11, hasta10kg: 86.50, kgAdicional: 3.86 },
+    "HOY": { hasta2kg: "Consultar", hasta5kg: "Consultar", hasta10kg: "Consultar", kgAdicional: "Consultar" }
+  }), []);
+
+  const suplementosPesoData = useMemo(() => [
+    { descripcion: "Bultos de más de 40 kg", precio: 10.00 },
+    { descripcion: "Bultos de más de 60 kg", precio: 20.00 }
+  ], []);
+
+  const suplementosDimensionesData = useMemo(() => [
+    { rango: "151–200 cm", precio: 22.35 },
+    { rango: "201–250 cm", precio: 67.77 },
+    { rango: "251–300 cm", precio: 114.00 }
+  ], []);
+
+  const serviciosAdicionalesData = useMemo(() => [
+    { concepto: "Reembolsos / Adelantos (6% del valor)", precio: 6.00 },
+    { concepto: "Confirmación inmediata", precio: 0.75 },
+    { concepto: "Seguro adicional", precio: 0 }
+  ], []);
+
+  // Funciones de cálculo
+  const calcularPrecioEnvio = useCallback((servicio: string, peso: number) => {
+    const tarifa = tarifasPorPeso[servicio];
+    if (!tarifa) return 0;
+    if (tarifa.hasta2kg === "Consultar") return 0;
+    if (peso <= 2) return tarifa.hasta2kg;
+    if (peso <= 5) return tarifa.hasta5kg;
+    if (peso <= 10) return tarifa.hasta10kg;
+    const kgExtra = peso - 10;
+    return tarifa.hasta10kg + (kgExtra * tarifa.kgAdicional);
+  }, [tarifasPorPeso]);
+
+  const calcularTotal = useMemo(() => {
+    let total = 0;
+    state.serviciosSeleccionados.forEach(s => { total += s.precio * s.cantidad; });
+    state.suplementosPeso.forEach(s => { total += s.precio * s.cantidad; });
+    state.suplementosDimensiones.forEach(s => { total += s.precio * s.cantidad; });
+    state.serviciosAdicionales.forEach(s => { total += s.precio * s.cantidad; });
+    total += parseFloat(state.otrosAjustes.valor || '0');
+    return total.toFixed(2);
+  }, [state]);
+
+  // Funciones para agregar servicios con click directo
+  const agregarServicio = useCallback((servicio: string, peso: number) => {
+    const precio = calcularPrecioEnvio(servicio, peso);
+    if (precio === 0 && servicio === "HOY") {
+      alert('Para el servicio HOY, por favor contacte con nuestro equipo comercial.');
+      return;
+    }
+    setState(prev => ({
+      ...prev,
+      serviciosSeleccionados: [...prev.serviciosSeleccionados, { servicio, peso, cantidad: 1, precio }]
+    }));
+  }, [calcularPrecioEnvio]);
+
+  const agregarSuplementoPeso = useCallback((descripcion: string, precio: number) => {
+    setState(prev => ({
+      ...prev,
+      suplementosPeso: [...prev.suplementosPeso, { descripcion, precio, cantidad: 1 }]
+    }));
+  }, []);
+
+  const agregarSuplementoDimension = useCallback((rango: string, precio: number) => {
+    setState(prev => ({
+      ...prev,
+      suplementosDimensiones: [...prev.suplementosDimensiones, { descripcion: `Suplemento ${rango}`, precio, cantidad: 1 }]
+    }));
+  }, []);
+
+  const agregarServicioAdicional = useCallback((concepto: string, precio: number) => {
+    setState(prev => ({
+      ...prev,
+      serviciosAdicionales: [...prev.serviciosAdicionales, { concepto, precio, cantidad: 1 }]
+    }));
+  }, []);
+
+  // Funciones para eliminar
+  const eliminarServicio = useCallback((index: number) => {
+    setState(prev => ({
+      ...prev,
+      serviciosSeleccionados: prev.serviciosSeleccionados.filter((_, i) => i !== index)
+    }));
+  }, []);
+
+  const eliminarSuplementoPeso = useCallback((index: number) => {
+    setState(prev => ({
+      ...prev,
+      suplementosPeso: prev.suplementosPeso.filter((_, i) => i !== index)
+    }));
+  }, []);
+
+  const eliminarSuplementoDimension = useCallback((index: number) => {
+    setState(prev => ({
+      ...prev,
+      suplementosDimensiones: prev.suplementosDimensiones.filter((_, i) => i !== index)
+    }));
+  }, []);
+
+  const eliminarServicioAdicional = useCallback((index: number) => {
+    setState(prev => ({
+      ...prev,
+      serviciosAdicionales: prev.serviciosAdicionales.filter((_, i) => i !== index)
+    }));
+  }, []);
+
+  // Funciones para actualizar campos editables
+  const actualizarServicio = useCallback((index: number, campo: string, valor: any) => {
+    setState(prev => ({
+      ...prev,
+      serviciosSeleccionados: prev.serviciosSeleccionados.map((s, i) => 
+        i === index ? { ...s, [campo]: valor } : s
+      )
+    }));
+  }, []);
+
+  const actualizarSuplementoPeso = useCallback((index: number, campo: string, valor: any) => {
+    setState(prev => ({
+      ...prev,
+      suplementosPeso: prev.suplementosPeso.map((s, i) => 
+        i === index ? { ...s, [campo]: valor } : s
+      )
+    }));
+  }, []);
+
+  const actualizarSuplementoDimension = useCallback((index: number, campo: string, valor: any) => {
+    setState(prev => ({
+      ...prev,
+      suplementosDimensiones: prev.suplementosDimensiones.map((s, i) => 
+        i === index ? { ...s, [campo]: valor } : s
+      )
+    }));
+  }, []);
+
+  const actualizarServicioAdicional = useCallback((index: number, campo: string, valor: any) => {
+    setState(prev => ({
+      ...prev,
+      serviciosAdicionales: prev.serviciosAdicionales.map((s, i) => 
+        i === index ? { ...s, [campo]: valor } : s
+      )
+    }));
+  }, []);
+
+  // Generar PDF
+  const generarPDF = useCallback(async () => {
+    if (!pageRef.current) return;
+    
+    setGenerandoPDF(true);
+    
+    try {
+      const [html2canvasModule, jsPDFModule] = await Promise.all([
+        import('html2canvas'),
+        import('jspdf')
+      ]);
+      const html2canvas = html2canvasModule.default;
+      const { jsPDF } = jsPDFModule;
+      
+      const elemento = pageRef.current;
+      const canvas = await html2canvas(elemento, { 
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff',
+        onclone: async (clonedDoc) => {
+          const allElements = clonedDoc.querySelectorAll('*');
+          allElements.forEach((el: any) => {
+            const computedStyle = clonedDoc.defaultView?.getComputedStyle(el);
+            if (!computedStyle) return;
+            
+            const hasUnsupportedColor = (color: string) => {
+              return color && (color.includes('oklch') || color.includes('oklab') || color.includes('lch') || color.includes('lab'));
+            };
+            
+            if (hasUnsupportedColor(computedStyle.color)) el.style.color = 'rgb(0, 0, 0)';
+            if (hasUnsupportedColor(computedStyle.backgroundColor)) el.style.backgroundColor = 'transparent';
+            if (hasUnsupportedColor(computedStyle.borderColor)) el.style.borderColor = 'rgb(0, 0, 0)';
+          });
+          
+
+        }
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'pt', 'a4');
+
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+
+      const marginX = 30;
+      const marginTop = 30;
+      
+      let imgWidth = pdfWidth - marginX * 2;
+      let imgHeight = (canvas.height * imgWidth) / canvas.width;
+      
+      const maxHeight = pdfHeight - marginTop - 30;
+      if (imgHeight > maxHeight) {
+        imgHeight = maxHeight;
+        imgWidth = (canvas.width * imgHeight) / canvas.height;
+      }
+
+      const posX = (pdfWidth - imgWidth) / 2;
+      const posY = marginTop;
+
+      pdf.addImage(imgData, 'PNG', posX, posY, imgWidth, imgHeight);
+
+      const slug = state.nombreCliente
+        ? '-' + state.nombreCliente.toLowerCase().replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '')
+        : '';
+      const fileName = `tarifario-mensajeria-express-2026${slug}.pdf`;
+
+      // Descargar PDF
+      pdf.save(fileName);
+
+      // Enviar PDF por email a info@onusexpress.com si no es admin
+      if (!isAdmin) {
+        try {
+          const userEmail = obtenerEmailUsuarioActual();
+          if (userEmail) {
+            /**
+             * PLACEHOLDER: Envío de presupuesto
+             * 
+             * INTEGRACIÓN FUTURA:
+             * - POST a /api/presupuestos con datos del cliente
+             * - Envío de email mediante Edge Function
+             * 
+             * nombreCliente viene de las props (ya autenticado)
+             */
+            
+            const userName = nombreCliente || 'Cliente';
+            
+            toast.info('Función de envío de presupuesto pendiente de integración con backend');
+            console.info('Presupuesto generado para:', userName);
+          }
+        } catch (emailError) {
+          console.error('Error al enviar email:', emailError);
+          // No mostramos error al usuario, el PDF ya se descargó correctamente
+        }
+      }
+    } catch (error) {
+      console.error('Error generando PDF:', error);
+      alert('Error al generar el PDF. Por favor, intenta de nuevo.');
+    } finally {
+      setGenerandoPDF(false);
+    }
+  }, [state.nombreCliente]);
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Contenido que se capturará en el PDF */}
+      <div ref={pageRef} className="max-w-[1200px] mx-auto bg-white shadow-lg">
+        {/* HEADER */}
+        <div className={`bg-[#000935] text-white py-4 px-6 ${generandoPDF ? 'rounded-t-lg' : ''}`}>
+          <div className="max-w-[1200px] mx-auto">
+            <div className="text-center">
+              <h1 className="tracking-wide mb-1">
+                {generandoPDF ? TEXTS.tarifarios.mensajeriaExpress.title.pdf : TEXTS.tarifarios.mensajeriaExpress.title.normal}
+              </h1>
+              <p className="text-[#00C9CE] text-xs">{TEXTS.tarifarios.mensajeriaExpress.subtitle}</p>
+            </div>
+          </div>
+        </div>
+
+        {generandoPDF ? (
+          /* VISTA DE PRESUPUESTO PARA PDF */
+          <div className="max-w-[1200px] mx-auto p-8 space-y-6">
+            
+            {state.nombreCliente && (
+              <div className="border-3 border-[#00C9CE] rounded-lg p-6 bg-white flex items-center justify-between">
+                <div className="text-[#00C9CE] text-sm">Cliente</div>
+                <div className="text-lg text-[#000935]">{state.nombreCliente}</div>
+              </div>
+            )}
+
+            <div className="border-2 border-[#000935] rounded-lg overflow-hidden">
+              <div className="bg-[#000935] text-white px-6 py-3">
+                <h3 className="text-base">Desglose de Servicios</h3>
+              </div>
+              <div className="p-6 bg-white space-y-6">
+                
+                {state.serviciosSeleccionados.length > 0 && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <Package className="h-4 w-4 text-[#00C9CE]" />
+                      <h4 className="text-[#00C9CE] text-sm">Servicios Express</h4>
+                    </div>
+                    <div>
+                      <div className="grid grid-cols-12 gap-4 py-2 text-xs text-gray-600">
+                        <div className="col-span-6">Concepto</div>
+                        <div className="col-span-2 text-center">Cantidad</div>
+                        <div className="col-span-2 text-right">Precio Unit.</div>
+                        <div className="col-span-2 text-right">Subtotal</div>
+                      </div>
+                      {state.serviciosSeleccionados.map((s, idx) => (
+                        <div key={idx} className="grid grid-cols-12 gap-4 py-3 text-sm">
+                          <div className="col-span-6">
+                            <div className="text-[#000935]">Servicio {s.servicio} – {s.peso} kg</div>
+                            <div className="text-xs text-gray-500">Mensajería Express</div>
+                          </div>
+                          <div className="col-span-2 text-center">{s.cantidad}</div>
+                          <div className="col-span-2 text-right">{s.precio.toFixed(2)} €</div>
+                          <div className="col-span-2 text-right text-[#00C9CE] font-medium">
+                            {(s.precio * s.cantidad).toFixed(2)} €
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {state.suplementosPeso.length > 0 && (
+                  <div>
+                    <h4 className="text-[#000935] text-sm mb-3">Suplementos por Peso</h4>
+                    <div>
+                      <div className="grid grid-cols-12 gap-4 py-2 text-xs text-gray-600">
+                        <div className="col-span-6">Concepto</div>
+                        <div className="col-span-2 text-center">Cantidad</div>
+                        <div className="col-span-2 text-right">Precio Unit.</div>
+                        <div className="col-span-2 text-right">Subtotal</div>
+                      </div>
+                      {state.suplementosPeso.map((s, idx) => (
+                        <div key={idx} className="grid grid-cols-12 gap-4 py-3 text-sm">
+                          <div className="col-span-6 text-[#000935]">{s.descripcion}</div>
+                          <div className="col-span-2 text-center">{s.cantidad}</div>
+                          <div className="col-span-2 text-right">{s.precio.toFixed(2)} €</div>
+                          <div className="col-span-2 text-right text-[#00C9CE] font-medium">
+                            {(s.precio * s.cantidad).toFixed(2)} €
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {state.suplementosDimensiones.length > 0 && (
+                  <div>
+                    <h4 className="text-[#000935] text-sm mb-3">Suplementos por Dimensiones</h4>
+                    <div>
+                      <div className="grid grid-cols-12 gap-4 py-2 text-xs text-gray-600">
+                        <div className="col-span-6">Concepto</div>
+                        <div className="col-span-2 text-center">Cantidad</div>
+                        <div className="col-span-2 text-right">Precio Unit.</div>
+                        <div className="col-span-2 text-right">Subtotal</div>
+                      </div>
+                      {state.suplementosDimensiones.map((s, idx) => (
+                        <div key={idx} className="grid grid-cols-12 gap-4 py-3 text-sm">
+                          <div className="col-span-6 text-[#000935]">{s.descripcion}</div>
+                          <div className="col-span-2 text-center">{s.cantidad}</div>
+                          <div className="col-span-2 text-right">{s.precio.toFixed(2)} €</div>
+                          <div className="col-span-2 text-right text-[#00C9CE] font-medium">
+                            {(s.precio * s.cantidad).toFixed(2)} €
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {state.serviciosAdicionales.length > 0 && (
+                  <div>
+                    <h4 className="text-[#000935] text-sm mb-3">Servicios Adicionales</h4>
+                    <div>
+                      <div className="grid grid-cols-12 gap-4 py-2 text-xs text-gray-600">
+                        <div className="col-span-6">Concepto</div>
+                        <div className="col-span-2 text-center">Cantidad</div>
+                        <div className="col-span-2 text-right">Precio Unit.</div>
+                        <div className="col-span-2 text-right">Subtotal</div>
+                      </div>
+                      {state.serviciosAdicionales.map((s, idx) => (
+                        <div key={idx} className="grid grid-cols-12 gap-4 py-3 text-sm">
+                          <div className="col-span-6 text-[#000935]">{s.concepto}</div>
+                          <div className="col-span-2 text-center">{s.cantidad}</div>
+                          <div className="col-span-2 text-right">{s.precio.toFixed(2)} €</div>
+                          <div className="col-span-2 text-right text-[#00C9CE] font-medium">
+                            {(s.precio * s.cantidad).toFixed(2)} €
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {state.otrosAjustes.valor !== '' && parseFloat(state.otrosAjustes.valor || '0') !== 0 && (
+                  <div>
+                    <h4 className="text-[#000935] text-sm mb-3">Otros Ajustes</h4>
+                    <div>
+                      <div className="grid grid-cols-12 gap-4 py-2 text-xs text-gray-600">
+                        <div className="col-span-10">Concepto</div>
+                        <div className="col-span-2 text-right">Importe</div>
+                      </div>
+                      <div className="grid grid-cols-12 gap-4 py-3 text-sm">
+                        <div className="col-span-10 text-[#000935]">
+                          {state.otrosAjustes.concepto || 'Ajustes adicionales'}
+                        </div>
+                        <div className={`col-span-2 text-right font-medium ${parseFloat(state.otrosAjustes.valor || '0') < 0 ? 'text-red-600' : 'text-[#00C9CE]'}`}>
+                          {parseFloat(state.otrosAjustes.valor || '0').toFixed(2)} €
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+              </div>
+            </div>
+
+            <div className="border-3 border-[#00C9CE] rounded-lg p-6 bg-white">
+              <div className="flex items-end justify-between">
+                <div>
+                  <div className="text-[#000935] text-sm">Total del presupuesto</div>
+                  <div className="text-xs text-gray-500">(sin IVA)</div>
+                </div>
+                <div className="text-[#00C9CE] text-4xl font-medium">{calcularTotal} €</div>
+              </div>
+            </div>
+
+            <div className="border-2 border-gray-300 rounded-lg overflow-hidden">
+              <div className="bg-gray-50 px-6 py-3 border-b border-gray-300">
+                <h3 className="text-[#000935] text-base">{TEXTS.tarifarios.common.conditions.title}</h3>
+              </div>
+              <div className="p-6 bg-white">
+                <div className="text-sm text-gray-700 space-y-1">
+                  <p>{TEXTS.tarifarios.common.conditions.pricesWithoutVAT}</p>
+                  <p>{TEXTS.tarifarios.common.conditions.scope}</p>
+                  <p>{TEXTS.tarifarios.common.conditions.validYear}</p>
+                  <p>{TEXTS.tarifarios.common.conditions.volumetricWeight}</p>
+                  <p>{TEXTS.tarifarios.common.conditions.basicInsurance}</p>
+                  <p>{TEXTS.tarifarios.common.conditions.cumulativeSurcharges}</p>
+                  <p>{TEXTS.tarifarios.common.conditions.quoteValidity}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="text-center text-xs text-gray-600 space-y-1 pt-4">
+              <p>
+                {TEXTS.tarifarios.common.legalFooter}
+              </p>
+            </div>
+
+          </div>
+        ) : (
+          /* VISTA NORMAL DEL TARIFARIO */
+          <div className="max-w-[1200px] mx-auto p-6">
+
+            <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-8">
+
+              <div className="space-y-6">
+                
+                {/* Catálogo de Servicios */}
+                <Card className="border-2 border-[#00C9CE] overflow-hidden rounded-lg">
+                  <CardHeader 
+                    className="bg-[#00C9CE]/10 cursor-pointer hover:bg-[#00C9CE]/20 transition-colors"
+                    onClick={() => setCatalogoAbierto(!catalogoAbierto)}
+                  >
+                    <CardTitle className="flex items-center justify-between text-[#00C9CE]">
+                      <span className="flex items-center gap-2">
+                        <Zap className="h-5 w-5" />
+                        Catálogo de Servicios Express
+                      </span>
+                      <ChevronDown className={`h-5 w-5 transition-transform ${catalogoAbierto ? 'rotate-180' : ''}`} />
+                    </CardTitle>
+                  </CardHeader>
+                  {catalogoAbierto && (
+                    <CardContent className="pt-6">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Servicio</TableHead>
+                            <TableHead>Descripción</TableHead>
+                            <TableHead>Uso recomendado</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {servicios.map((s, idx) => (
+                            <TableRow key={idx}>
+                              <TableCell className="text-[#00C9CE] font-medium">{s.nombre}</TableCell>
+                              <TableCell>{s.descripcion}</TableCell>
+                              <TableCell className="text-sm text-gray-600">{s.uso}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </CardContent>
+                  )}
+                </Card>
+
+                {/* Tarifas por Peso */}
+                <Card className="border-2 border-[#00C9CE] overflow-hidden rounded-lg">
+                  <CardHeader 
+                    className="bg-[#00C9CE]/10 cursor-pointer hover:bg-[#00C9CE]/20 transition-colors"
+                    onClick={() => setTarifasPesoAbierto(!tarifasPesoAbierto)}
+                  >
+                    <CardTitle className="flex items-center justify-between text-[#00C9CE]">
+                      <span className="flex items-center gap-2">
+                        <Weight className="h-5 w-5" />
+                        Tarifas por Peso (€)
+                      </span>
+                      <ChevronDown className={`h-5 w-5 transition-transform ${tarifasPesoAbierto ? 'rotate-180' : ''}`} />
+                    </CardTitle>
+                  </CardHeader>
+                  {tarifasPesoAbierto && (
+                  <CardContent className="pt-6">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Servicio</TableHead>
+                          <TableHead className="text-right">Hasta 2kg</TableHead>
+                          <TableHead className="text-right">Hasta 5kg</TableHead>
+                          <TableHead className="text-right">Hasta 10kg</TableHead>
+                          <TableHead className="text-right">Kg adicional</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {Object.entries(tarifasPorPeso).map(([servicio, tarifa]) => (
+                          <TableRow key={servicio}>
+                            <TableCell className="text-[#00C9CE] font-medium">{servicio}</TableCell>
+                            <TableCell 
+                              className="text-right cursor-pointer hover:bg-[#00C9CE]/10 transition-colors font-medium"
+                              onClick={() => {
+                                if (tarifa.hasta2kg !== "Consultar") {
+                                  agregarServicio(servicio, 2);
+                                }
+                              }}
+                            >
+                              {typeof tarifa.hasta2kg === 'number' ? tarifa.hasta2kg.toFixed(2) : tarifa.hasta2kg}
+                            </TableCell>
+                            <TableCell 
+                              className="text-right cursor-pointer hover:bg-[#00C9CE]/10 transition-colors font-medium"
+                              onClick={() => {
+                                if (tarifa.hasta5kg !== "Consultar") {
+                                  agregarServicio(servicio, 5);
+                                }
+                              }}
+                            >
+                              {typeof tarifa.hasta5kg === 'number' ? tarifa.hasta5kg.toFixed(2) : tarifa.hasta5kg}
+                            </TableCell>
+                            <TableCell 
+                              className="text-right cursor-pointer hover:bg-[#00C9CE]/10 transition-colors font-medium"
+                              onClick={() => {
+                                if (tarifa.hasta10kg !== "Consultar") {
+                                  agregarServicio(servicio, 10);
+                                }
+                              }}
+                            >
+                              {typeof tarifa.hasta10kg === 'number' ? tarifa.hasta10kg.toFixed(2) : tarifa.hasta10kg}
+                            </TableCell>
+                            <TableCell 
+                              className="text-right cursor-pointer hover:bg-[#00C9CE]/10 transition-colors font-medium"
+                              onClick={() => {
+                                if (tarifa.kgAdicional !== "Consultar") {
+                                  agregarServicio(servicio, 15);
+                                }
+                              }}
+                            >
+                              {typeof tarifa.kgAdicional === 'number' ? tarifa.kgAdicional.toFixed(2) : tarifa.kgAdicional}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                  )}
+                </Card>
+
+                {/* Suplementos por Peso */}
+                <Card className="border-2 border-[#00C9CE] overflow-hidden rounded-lg">
+                  <CardHeader 
+                    className="bg-[#00C9CE]/10 cursor-pointer hover:bg-[#00C9CE]/20 transition-colors"
+                    onClick={() => setSuplementosPesoAbierto(!suplementosPesoAbierto)}
+                  >
+                    <CardTitle className="flex items-center justify-between text-[#00C9CE]">
+                      <span className="flex items-center gap-2">
+                        <Truck className="h-5 w-5" />
+                        Suplementos por Peso
+                      </span>
+                      <ChevronDown className={`h-5 w-5 transition-transform ${suplementosPesoAbierto ? 'rotate-180' : ''}`} />
+                    </CardTitle>
+                  </CardHeader>
+                  {suplementosPesoAbierto && (
+                    <CardContent className="pt-6">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Descripción</TableHead>
+                            <TableHead className="text-right">Precio (€)</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {suplementosPesoData.map((s, idx) => (
+                            <TableRow 
+                              key={idx}
+                              onClick={() => agregarSuplementoPeso(s.descripcion, s.precio)}
+                              className="cursor-pointer transition-colors hover:bg-[#00C9CE]/10"
+                            >
+                              <TableCell>{s.descripcion}</TableCell>
+                              <TableCell className="text-right font-medium">{s.precio.toFixed(2)}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </CardContent>
+                  )}
+                </Card>
+
+                {/* Suplementos por Dimensiones */}
+                <Card className="border-2 border-[#00C9CE] overflow-hidden rounded-lg">
+                  <CardHeader 
+                    className="bg-[#00C9CE]/10 cursor-pointer hover:bg-[#00C9CE]/20 transition-colors"
+                    onClick={() => setSuplementosDimAbierto(!suplementosDimAbierto)}
+                  >
+                    <CardTitle className="flex items-center justify-between text-[#00C9CE]">
+                      <span className="flex items-center gap-2">
+                        <Ruler className="h-5 w-5" />
+                        Suplementos por Dimensiones
+                      </span>
+                      <ChevronDown className={`h-5 w-5 transition-transform ${suplementosDimAbierto ? 'rotate-180' : ''}`} />
+                    </CardTitle>
+                  </CardHeader>
+                  {suplementosDimAbierto && (
+                    <CardContent className="pt-6">
+                      <div className="text-sm text-gray-700 mb-3 bg-blue-50 p-3 rounded border border-blue-200">
+                        <strong>Medición:</strong> Suma de largo + ancho + alto (cm)
+                      </div>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Rango (cm)</TableHead>
+                            <TableHead className="text-right">Precio (€)</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {suplementosDimensionesData.map((s, idx) => (
+                            <TableRow 
+                              key={idx}
+                              onClick={() => agregarSuplementoDimension(s.rango, s.precio)}
+                              className="cursor-pointer transition-colors hover:bg-[#00C9CE]/10"
+                            >
+                              <TableCell>{s.rango}</TableCell>
+                              <TableCell className="text-right font-medium">{s.precio.toFixed(2)}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </CardContent>
+                  )}
+                </Card>
+
+                {/* Servicios Adicionales */}
+                <Card className="border-2 border-[#00C9CE] overflow-hidden rounded-lg">
+                  <CardHeader 
+                    className="bg-[#00C9CE]/10 cursor-pointer hover:bg-[#00C9CE]/20 transition-colors"
+                    onClick={() => setAdicionalesAbierto(!adicionalesAbierto)}
+                  >
+                    <CardTitle className="flex items-center justify-between text-[#00C9CE]">
+                      <span className="flex items-center gap-2">
+                        <Plus className="h-5 w-5" />
+                        Servicios Adicionales
+                      </span>
+                      <ChevronDown className={`h-5 w-5 transition-transform ${adicionalesAbierto ? 'rotate-180' : ''}`} />
+                    </CardTitle>
+                  </CardHeader>
+                  {adicionalesAbierto && (
+                    <CardContent className="pt-6">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Concepto</TableHead>
+                            <TableHead className="text-right">Precio</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {serviciosAdicionalesData.map((s, idx) => (
+                            <TableRow 
+                              key={idx}
+                              onClick={() => agregarServicioAdicional(s.concepto, s.precio)}
+                              className="cursor-pointer transition-colors hover:bg-[#00C9CE]/10"
+                            >
+                              <TableCell>{s.concepto}</TableCell>
+                              <TableCell className="text-right font-medium">
+                                {s.precio > 0 ? `${s.precio.toFixed(2)} €` : 'Variable'}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </CardContent>
+                  )}
+                </Card>
+
+                {/* Condiciones Comerciales */}
+                <Card className="border-2 border-[#00C9CE] overflow-hidden rounded-lg">
+                  <CardHeader 
+                    className="bg-[#00C9CE]/10 cursor-pointer hover:bg-[#00C9CE]/20 transition-colors"
+                    onClick={() => setCondicionesAbierto(!condicionesAbierto)}
+                  >
+                    <CardTitle className="flex items-center justify-between text-[#00C9CE]">
+                      <span className="flex items-center gap-2">
+                        <FileText className="h-5 w-5" />
+                        Condiciones Comerciales
+                      </span>
+                      <ChevronDown className={`h-5 w-5 transition-transform ${condicionesAbierto ? 'rotate-180' : ''}`} />
+                    </CardTitle>
+                  </CardHeader>
+                  {condicionesAbierto && (
+                    <CardContent className="pt-6">
+                      <div className="bg-blue-50 p-4 rounded border border-blue-200 text-sm space-y-3">
+                        <ul className="space-y-2 ml-5 list-disc">
+                          <li>Precios sin IVA</li>
+                          <li>Ámbito: Península Ibérica</li>
+                          <li>Tarifas válidas para 2026</li>
+                          <li>Peso volumétrico: (L × A × H cm) / 5000</li>
+                          <li>Seguro básico incluido hasta 300 €</li>
+                          <li>Facturación mensual por defecto</li>
+                        </ul>
+                      </div>
+                    </CardContent>
+                  )}
+                </Card>
+
+              </div>
+
+              {/* COLUMNA DERECHA - SIMULADOR */}
+              <Card className="border-2 border-[#00C9CE] shadow-lg overflow-hidden rounded-lg">
+                <CardHeader className="bg-[#00C9CE] text-white">
+                  <CardTitle className="text-white text-center uppercase">PRESUPUESTO</CardTitle>
+                </CardHeader>
+                <CardContent className="pt-6 space-y-4">
+                  
+                  {/* Nombre del cliente */}
+                  <div className="p-4 bg-gray-50 rounded-lg space-y-3">
+                    <Label htmlFor="nombreCliente">Nombre del cliente</Label>
+                    <Input
+                      id="nombreCliente"
+                      type="text"
+                      placeholder="Ej: Empresa SL"
+                      value={state.nombreCliente}
+                      onChange={(e) => setState(prev => ({ ...prev, nombreCliente: e.target.value }))}
+                      className="border-[#00C9CE] focus-visible:ring-[#00C9CE]"
+                    />
+                  </div>
+
+                  {/* Servicios seleccionados */}
+                  <div className="p-4 bg-gray-50 rounded-lg space-y-3">
+                    <Label className="flex items-center justify-between">
+                      <span>Servicios Express</span>
+                      <span className="text-xs text-gray-600">Haz clic en las tablas</span>
+                    </Label>
+                    
+                    {state.serviciosSeleccionados.length === 0 ? (
+                      <div className="text-sm text-gray-500 italic p-3 border border-dashed border-gray-300 rounded text-center">
+                        No hay servicios seleccionados.<br />
+                        Haz clic en las celdas de precio para agregar.
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {state.serviciosSeleccionados.map((s, idx) => (
+                          <div key={idx} className="bg-white border-2 border-[#00C9CE] rounded-lg p-3 space-y-3">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex-1 space-y-2">
+                                <div>
+                                  <Label htmlFor={`servicio-${idx}`} className="text-xs">Servicio</Label>
+                                  <Input
+                                    id={`servicio-${idx}`}
+                                    type="text"
+                                    value={`${s.servicio} – ${s.peso} kg`}
+                                    onChange={(e) => {
+                                      const partes = e.target.value.split('–');
+                                      if (partes.length >= 2) {
+                                        actualizarServicio(idx, 'servicio', partes[0].trim());
+                                        const pesoMatch = partes[1].match(/\d+/);
+                                        if (pesoMatch) {
+                                          actualizarServicio(idx, 'peso', parseInt(pesoMatch[0]));
+                                        }
+                                      }
+                                    }}
+                                    className="border-[#00C9CE] focus-visible:ring-[#00C9CE] text-sm h-8"
+                                  />
+                                </div>
+                              </div>
+                              
+                              <button
+                                onClick={() => eliminarServicio(idx)}
+                                className="text-red-500 hover:text-red-700 p-1"
+                                title="Eliminar"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <Label htmlFor={`cant-srv-${idx}`} className="text-xs">Cantidad</Label>
+                                <Input
+                                  id={`cant-srv-${idx}`}
+                                  type="number"
+                                  min="1"
+                                  value={s.cantidad}
+                                  onChange={(e) => actualizarServicio(idx, 'cantidad', parseInt(e.target.value) || 1)}
+                                  className="border-[#00C9CE] focus-visible:ring-[#00C9CE] text-sm h-8"
+                                />
+                              </div>
+                              <div>
+                                <Label htmlFor={`precio-srv-${idx}`} className="text-xs">Precio €</Label>
+                                <Input
+                                  id={`precio-srv-${idx}`}
+                                  type="number"
+                                  step="0.01"
+                                  value={s.precio}
+                                  onChange={(e) => actualizarServicio(idx, 'precio', parseFloat(e.target.value) || 0)}
+                                  className="border-[#00C9CE] focus-visible:ring-[#00C9CE] text-sm h-8"
+                                />
+                              </div>
+                            </div>
+                            
+                            <div className="text-right text-sm pt-1 border-t border-gray-200">
+                              <span className="text-gray-600">Subtotal: </span>
+                              <span className="font-medium text-[#00C9CE]">{(s.precio * s.cantidad).toFixed(2)} €</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Suplementos peso seleccionados */}
+                  {state.suplementosPeso.length > 0 && (
+                    <div className="p-4 bg-gray-50 rounded-lg space-y-3">
+                      <Label>Suplementos por Peso</Label>
+                      <div className="space-y-2">
+                        {state.suplementosPeso.map((s, idx) => (
+                          <div key={idx} className="bg-white border-2 border-[#00C9CE] rounded-lg p-3 space-y-3">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex-1">
+                                <div className="text-sm font-medium text-[#000935]">{s.descripcion}</div>
+                              </div>
+                              <button
+                                onClick={() => eliminarSuplementoPeso(idx)}
+                                className="text-red-500 hover:text-red-700 p-1"
+                                title="Eliminar"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <Label htmlFor={`cant-peso-${idx}`} className="text-xs">Cantidad</Label>
+                                <Input
+                                  id={`cant-peso-${idx}`}
+                                  type="number"
+                                  min="1"
+                                  value={s.cantidad}
+                                  onChange={(e) => actualizarSuplementoPeso(idx, 'cantidad', parseInt(e.target.value) || 1)}
+                                  className="border-[#00C9CE] focus-visible:ring-[#00C9CE] text-sm h-8"
+                                />
+                              </div>
+                              <div>
+                                <Label htmlFor={`precio-peso-${idx}`} className="text-xs">Precio €</Label>
+                                <Input
+                                  id={`precio-peso-${idx}`}
+                                  type="number"
+                                  step="0.01"
+                                  value={s.precio}
+                                  onChange={(e) => actualizarSuplementoPeso(idx, 'precio', parseFloat(e.target.value) || 0)}
+                                  className="border-[#00C9CE] focus-visible:ring-[#00C9CE] text-sm h-8"
+                                />
+                              </div>
+                            </div>
+                            
+                            <div className="text-right text-sm pt-1 border-t border-gray-200">
+                              <span className="text-gray-600">Subtotal: </span>
+                              <span className="font-medium text-[#00C9CE]">{(s.precio * s.cantidad).toFixed(2)} €</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Suplementos dimensiones seleccionados */}
+                  {state.suplementosDimensiones.length > 0 && (
+                    <div className="p-4 bg-gray-50 rounded-lg space-y-3">
+                      <Label>Suplementos por Dimensiones</Label>
+                      <div className="space-y-2">
+                        {state.suplementosDimensiones.map((s, idx) => (
+                          <div key={idx} className="bg-white border-2 border-[#00C9CE] rounded-lg p-3 space-y-3">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex-1">
+                                <div className="text-sm font-medium text-[#000935]">{s.descripcion}</div>
+                              </div>
+                              <button
+                                onClick={() => eliminarSuplementoDimension(idx)}
+                                className="text-red-500 hover:text-red-700 p-1"
+                                title="Eliminar"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <Label htmlFor={`cant-dim-${idx}`} className="text-xs">Cantidad</Label>
+                                <Input
+                                  id={`cant-dim-${idx}`}
+                                  type="number"
+                                  min="1"
+                                  value={s.cantidad}
+                                  onChange={(e) => actualizarSuplementoDimension(idx, 'cantidad', parseInt(e.target.value) || 1)}
+                                  className="border-[#00C9CE] focus-visible:ring-[#00C9CE] text-sm h-8"
+                                />
+                              </div>
+                              <div>
+                                <Label htmlFor={`precio-dim-${idx}`} className="text-xs">Precio €</Label>
+                                <Input
+                                  id={`precio-dim-${idx}`}
+                                  type="number"
+                                  step="0.01"
+                                  value={s.precio}
+                                  onChange={(e) => actualizarSuplementoDimension(idx, 'precio', parseFloat(e.target.value) || 0)}
+                                  className="border-[#00C9CE] focus-visible:ring-[#00C9CE] text-sm h-8"
+                                />
+                              </div>
+                            </div>
+                            
+                            <div className="text-right text-sm pt-1 border-t border-gray-200">
+                              <span className="text-gray-600">Subtotal: </span>
+                              <span className="font-medium text-[#00C9CE]">{(s.precio * s.cantidad).toFixed(2)} €</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Servicios adicionales seleccionados */}
+                  {state.serviciosAdicionales.length > 0 && (
+                    <div className="p-4 bg-gray-50 rounded-lg space-y-3">
+                      <Label>Servicios Adicionales</Label>
+                      <div className="space-y-2">
+                        {state.serviciosAdicionales.map((s, idx) => (
+                          <div key={idx} className="bg-white border-2 border-[#00C9CE] rounded-lg p-3 space-y-3">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex-1">
+                                <div className="text-sm font-medium text-[#000935]">{s.concepto}</div>
+                              </div>
+                              <button
+                                onClick={() => eliminarServicioAdicional(idx)}
+                                className="text-red-500 hover:text-red-700 p-1"
+                                title="Eliminar"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <Label htmlFor={`cant-adic-${idx}`} className="text-xs">Cantidad</Label>
+                                <Input
+                                  id={`cant-adic-${idx}`}
+                                  type="number"
+                                  min="1"
+                                  value={s.cantidad}
+                                  onChange={(e) => actualizarServicioAdicional(idx, 'cantidad', parseInt(e.target.value) || 1)}
+                                  className="border-[#00C9CE] focus-visible:ring-[#00C9CE] text-sm h-8"
+                                />
+                              </div>
+                              <div>
+                                <Label htmlFor={`precio-adic-${idx}`} className="text-xs">Precio €</Label>
+                                <Input
+                                  id={`precio-adic-${idx}`}
+                                  type="number"
+                                  step="0.01"
+                                  value={s.precio}
+                                  onChange={(e) => actualizarServicioAdicional(idx, 'precio', parseFloat(e.target.value) || 0)}
+                                  className="border-[#00C9CE] focus-visible:ring-[#00C9CE] text-sm h-8"
+                                />
+                              </div>
+                            </div>
+                            
+                            <div className="text-right text-sm pt-1 border-t border-gray-200">
+                              <span className="text-gray-600">Subtotal: </span>
+                              <span className="font-medium text-[#00C9CE]">{(s.precio * s.cantidad).toFixed(2)} €</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Otros ajustes - Solo visible para administradores */}
+                  {isAdmin && (
+                    <div className="p-4 bg-gray-50 rounded-lg space-y-3">
+                      <div className="text-sm mb-2">
+                        <strong>Otros ajustes</strong>
+                        <span className="block text-xs text-gray-600 mt-1">(descuentos, suplementos especiales, etc.)</span>
+                      </div>
+                      <div className="space-y-2">
+                        <div>
+                          <Label htmlFor="otrosAjustesConcepto" className="text-xs">Concepto</Label>
+                          <Input
+                            id="otrosAjustesConcepto"
+                            type="text"
+                            placeholder="Ej: Descuento especial..."
+                            value={state.otrosAjustes.concepto}
+                            onChange={(e) => setState(prev => ({ ...prev, otrosAjustes: { ...prev.otrosAjustes, concepto: e.target.value } }))}
+                            className="border-[#00C9CE] focus-visible:ring-[#00C9CE] text-sm"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="otrosAjustesValor" className="text-xs">
+                            Importe €
+                            <span className="block text-xs text-gray-500">(usa - para descuentos: -50)</span>
+                          </Label>
+                          <Input
+                            id="otrosAjustesValor"
+                            type="text"
+                            placeholder="0"
+                            value={state.otrosAjustes.valor}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              if (value === '' || /^-?\d*\.?\d*$/.test(value)) {
+                                setState(prev => ({ ...prev, otrosAjustes: { ...prev.otrosAjustes, valor: value } }));
+                              }
+                            }}
+                            className="border-[#00C9CE] focus-visible:ring-[#00C9CE] text-sm"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Total */}
+                  <div className="bg-[#000935] text-white p-4 rounded-lg flex items-center justify-between">
+                    <span className="text-lg">Total estimado:</span>
+                    <span className="text-[#00C9CE] text-xl">{calcularTotal} €</span>
+                  </div>
+
+                  {/* Botón Enviar solicitud */}
+                  <button
+                    onClick={generarPDF}
+                    className="w-full bg-[#00C9CE] hover:bg-[#00C9CE]/90 text-white py-3 rounded-full font-medium transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2"
+                  >
+                    <Download className="h-5 w-5" />
+                    Enviar solicitud
+                  </button>
+
+                </CardContent>
+              </Card>
+
+            </div>
+
+            <div className="bg-gray-100 p-6 rounded-lg text-center text-sm text-gray-700 space-y-2 mt-8">
+              <p>
+                <strong>ONUS Express SL</strong> · www.onusexpress.com · Carrer d'Anselm Clavé, s/n, Nave 24 – PI Matacás – 08980 Sant Feliu de Llobregat, Barcelona · NIF: B72735277
+              </p>
+            </div>
+
+          </div>
+        )}
+      </div>
+    </div>
+  );
+});
+
+TarifarioMensajeriaExpress.displayName = 'TarifarioMensajeriaExpress';
