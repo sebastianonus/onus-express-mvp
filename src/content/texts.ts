@@ -301,12 +301,12 @@ export const TEXTS = {
   clients: {
     title: "Área de Clientes",
     subtitle: "Acceda a sus tarifarios personalizados con su código de cliente",
-    formTitle: "Acceso con Código de Cliente",
+    formTitle: "Acceso Cliente",
     form: {
       labels: {
         clientCode: "Código de Cliente",
         accessButton: "Acceder a Tarifarios",
-        noCode: "¿No tiene un código de cliente?",
+        noCode: "¿No tiene un cuenta de cliente?",
         requestAccess: "Solicitar Acceso",
         testCode: "Código de prueba: 000000",
       },
