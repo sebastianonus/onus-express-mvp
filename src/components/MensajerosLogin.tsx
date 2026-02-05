@@ -1,43 +1,43 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { createClient } from '@supabase/supabase-js';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Button } from './ui/button';
-import { Loader2, UserCircle, X, Mail, Lock } from 'lucide-react';
+import { Loader2, UserCircle, X, Mail } from 'lucide-react';
 import { toast } from 'sonner';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from './ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import backgroundImage from 'figma:asset/4261f3db5c66ef3456a8ebcae9838917a1e10ea5.png';
 import logo from 'figma:asset/e80d7ef4ac3b9441721d6916cfc8ad34baf40db1.png';
 import { TEXTS } from '@/content/texts';
 
-/**
- * COMPONENTE: Login de Mensajeros - Frontend limpio sin backend
- * 
- * ESTADO ACTUAL: Solo UI funcional
- * - Formulario de magic link (visual)
- * - Formulario de registro (visual)
- * - NO guarda datos
- * - NO autentica usuarios
- * - NO persiste estado
- * 
- * INTEGRACIÓN FUTURA:
- * - handleMagicLinkSubmit → supabase.auth.signInWithOtp()
- * - handleFormSubmit → supabase.auth.signUp() + insertar en tabla mensajeros
- */
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 
+const supabase =
+  supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
+
+/**
+ * COMPONENTE: Login de Mensajeros
+ *
+ * Reglas MVP:
+ * - Mensajeros: Magic link (Supabase Auth signInWithOtp)
+ * - Sin localStorage, sin mocks, sin flujos inventados
+ *
+ * Registro:
+ * - Inserta solicitud en tabla pública: solicitudes_mensajeros (solo INSERT con RLS)
+ */
 export function MensajerosLogin() {
   const navigate = useNavigate();
+
   const [showForm, setShowForm] = useState(false);
+
+  // Login (magic link)
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [loginError, setLoginError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Registro (solicitud)
   const [formData, setFormData] = useState({
     email: '',
     nombre: '',
@@ -48,69 +48,82 @@ export function MensajerosLogin() {
   });
   const [formLoading, setFormLoading] = useState(false);
 
-  /**
-   * PLACEHOLDER: Login con email y contraseña
-   * 
-   * INTEGRACIÓN FUTURA:
-   * await supabase.auth.signInWithPassword({ email, password });
-   */
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setLoginError('');
     setLoading(true);
 
     try {
-      /**
-       * PLACEHOLDER: Login de mensajero
-       * 
-       * INTEGRACIÓN FUTURA:
-       * await supabase.auth.signInWithPassword({ email, password })
-       */
-      toast.info('Función de login pendiente de integración con Supabase Auth');
-      setLoading(false);
-    } catch (error) {
-      console.error('Error en login:', error);
-      setError('Email o contraseña incorrectos');
+      if (!supabase) {
+        setLoginError('Configuración de Supabase incompleta');
+        return;
+      }
+
+      const emailTrimmed = email.trim();
+      if (!emailTrimmed) {
+        setLoginError(TEXTS.couriers?.login?.errors?.emailRequired ?? 'Introduce un email válido');
+        return;
+      }
+
+      const redirectTo = `${window.location.origin}/mensajeros`;
+
+      const { error } = await supabase.auth.signInWithOtp({
+        email: emailTrimmed,
+        options: { emailRedirectTo: redirectTo },
+      });
+
+      if (error) {
+        setLoginError('No se pudo enviar el enlace. Revisa el email e inténtalo de nuevo.');
+        return;
+      }
+
+      toast.success('Revisa tu correo: te enviamos un enlace de acceso.');
+    } catch (err) {
+      console.error('Error en login:', err);
+      setLoginError('No se pudo enviar el enlace. Intenta nuevamente.');
+    } finally {
       setLoading(false);
     }
   };
 
   const handleFormChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSelectChange = (name: string, value: string) => {
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  /**
-   * PLACEHOLDER: Registro de nuevo mensajero
-   * 
-   * INTEGRACIÓN FUTURA:
-   * 1. await supabase.auth.signUp({ email, password })
-   * 2. await supabase.from('mensajeros').insert({ ...formData, user_id })
-   * 3. Asignar role 'mensajero' en app_metadata
-   */
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormLoading(true);
 
     try {
-      /**
-       * PLACEHOLDER: Registro de mensajero
-       * 
-       * INTEGRACIÓN FUTURA:
-       * 1. await supabase.auth.signUp({ email, password })
-       * 2. await supabase.from('mensajeros').insert({ ...formData, user_id })
-       * 3. Asignar role 'mensajero'
-       */
-      
-      toast.info('Función de registro pendiente de integración con Supabase Auth');
-      setFormLoading(false);
+      if (!supabase) {
+        toast.error('Configuración de Supabase incompleta');
+        return;
+      }
+
+      const payload = {
+        email: formData.email.trim(),
+        nombre: formData.nombre.trim(),
+        telefono: formData.telefono.trim(),
+        ciudad: formData.ciudad,
+        vehiculo: formData.vehiculo,
+        flotista: formData.flotista,
+      };
+
+      const { error } = await supabase.from('solicitudes_mensajeros').insert(payload);
+
+      if (error) {
+        toast.error('No se pudo enviar la solicitud. Intenta nuevamente.');
+        return;
+      }
+
+      toast.success('Solicitud enviada. Te contactaremos a la mayor brevedad.');
       setShowForm(false);
-      
-      // Resetear formulario
+
       setFormData({
         email: '',
         nombre: '',
@@ -119,136 +132,128 @@ export function MensajerosLogin() {
         vehiculo: '',
         flotista: '',
       });
-    } catch (error) {
-      console.error('Error en registro:', error);
+    } catch (err) {
+      console.error('Error en registro:', err);
       toast.error('Error al registrar. Intenta nuevamente.');
+    } finally {
       setFormLoading(false);
     }
   };
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row">
-      {/* Columna izquierda: Imagen */}
-      <div 
+      <div
         className="hidden md:block md:w-1/2 bg-cover bg-center relative"
         style={{ backgroundImage: `url(${backgroundImage})` }}
       >
         <div className="absolute inset-0 bg-[#000935]/60" />
       </div>
 
-      {/* Columna derecha: Formulario */}
       <div className="w-full md:w-1/2 bg-white flex items-center justify-center p-6 md:p-12">
         <div className="w-full max-w-md">
-          {/* Logo */}
           <div className="flex justify-center mb-10">
             <img src={logo} alt="ONUS Express" className="h-14" />
           </div>
 
           {!showForm ? (
-            <>
-              {/* Magic Link Form */}
-              <div>
-                <h1 className="text-2xl font-semibold text-[#000935] mb-2 text-center">
-                  {TEXTS.couriers.login.title}
-                </h1>
-                <p className="text-gray-500 text-sm mb-8 text-center">
-                  {TEXTS.couriers.login.subtitle}
-                </p>
+            <div>
+              <h1 className="text-2xl font-semibold text-[#000935] mb-2 text-center">
+                {TEXTS.couriers.login.title}
+              </h1>
+              <p className="text-gray-500 text-sm mb-8 text-center">
+                {TEXTS.couriers.login.subtitle}
+              </p>
 
-                <form onSubmit={handleLoginSubmit} className="space-y-5">
-                  <div>
-                    <Label htmlFor="email" className="text-sm font-medium text-gray-700 mb-2 block">
-                      {TEXTS.couriers.login.emailLabel}
-                    </Label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                      <Input
-                        id="email"
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder={TEXTS.couriers.login.emailPlaceholder}
-                        className="pl-10 h-11 border-gray-300 focus:border-[#00C9CE] focus:ring-[#00C9CE]"
-                        required
-                      />
-                    </div>
+              <form onSubmit={handleLoginSubmit} className="space-y-5">
+                <div>
+                  <Label htmlFor="email" className="text-sm font-medium text-gray-700 mb-2 block">
+                    {TEXTS.couriers.login.emailLabel}
+                  </Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input
+                      id="email"
+                      type="email"
+                      value={email}
+                      onChange={(e) => {
+                        setEmail(e.target.value);
+                        setLoginError('');
+                      }}
+                      placeholder={TEXTS.couriers.login.emailPlaceholder}
+                      className="pl-10 h-11 border-gray-300 focus:border-[#00C9CE] focus:ring-[#00C9CE]"
+                      required
+                      disabled={loading}
+                      autoComplete="email"
+                    />
                   </div>
+                </div>
 
-                  <div>
-                    <Label htmlFor="password" className="text-sm font-medium text-gray-700 mb-2 block">
-                      {TEXTS.couriers.login.passwordLabel}
-                    </Label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                      <Input
-                        id="password"
-                        type="password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        placeholder={TEXTS.couriers.login.passwordPlaceholder}
-                        className="pl-10 h-11 border-gray-300 focus:border-[#00C9CE] focus:ring-[#00C9CE]"
-                        required
-                      />
-                    </div>
-                  </div>
+                {loginError && (
+                  <div className="text-red-500 text-sm bg-red-50 p-3 rounded-md">{loginError}</div>
+                )}
 
-                  {error && (
-                    <div className="text-red-500 text-sm bg-red-50 p-3 rounded-md">{error}</div>
+                <Button
+                  type="submit"
+                  className="w-full h-11 bg-[#00C9CE] hover:bg-[#00B5BA] text-white font-medium"
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      {TEXTS.couriers.login.sendingButton}
+                    </>
+                  ) : (
+                    TEXTS.couriers.login.sendButton
                   )}
+                </Button>
 
+                <div className="text-center">
                   <Button
-                    type="submit"
-                    className="w-full h-11 bg-[#00C9CE] hover:bg-[#00B5BA] text-white font-medium"
+                    type="button"
+                    onClick={() => navigate('/mensajeros/recuperar-contrasena')}
+                    variant="ghost"
+                    className="text-sm text-gray-600 hover:text-[#00C9CE]"
                     disabled={loading}
                   >
-                    {loading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        {TEXTS.couriers.login.sendingButton}
-                      </>
-                    ) : (
-                      TEXTS.couriers.login.sendButton
-                    )}
-                  </Button>
-                </form>
-
-                <div className="mt-8 text-center">
-                  <p className="text-sm text-gray-600 mb-3">
-                    {TEXTS.couriers.login.noAccount}
-                  </p>
-                  <Button
-                    onClick={() => setShowForm(true)}
-                    variant="outline"
-                    className="w-full h-11 border-[#00C9CE] text-[#00C9CE] hover:bg-[#00C9CE]/5 font-medium"
-                  >
-                    <UserCircle className="mr-2 h-4 w-4" />
-                    {TEXTS.couriers.login.registerButton}
+                    ¿Olvidaste tu contraseña?
                   </Button>
                 </div>
+              </form>
 
-                <div className="mt-6 text-center">
-                  <Button
-                    onClick={() => navigate('/')}
-                    variant="ghost"
-                    className="text-sm text-gray-500 hover:text-gray-700"
-                  >
-                    {TEXTS.couriers.login.backToSite}
-                  </Button>
-                </div>
+              <div className="mt-8 text-center">
+                <p className="text-sm text-gray-600 mb-3">{TEXTS.couriers.login.noAccount}</p>
+                <Button
+                  onClick={() => setShowForm(true)}
+                  variant="outline"
+                  className="w-full h-11 border-[#00C9CE] text-[#00C9CE] hover:bg-[#00C9CE]/5 font-medium"
+                  disabled={loading}
+                >
+                  <UserCircle className="mr-2 h-4 w-4" />
+                  {TEXTS.couriers.login.registerButton}
+                </Button>
               </div>
-            </>
+
+              <div className="mt-6 text-center">
+                <Button
+                  onClick={() => navigate('/')}
+                  variant="ghost"
+                  className="text-sm text-gray-500 hover:text-gray-700"
+                  disabled={loading}
+                >
+                  {TEXTS.couriers.login.backToSite}
+                </Button>
+              </div>
+            </div>
           ) : (
-            /* Registration Form */
             <div>
               <div className="flex items-center justify-between mb-6">
-                <h1 className="text-2xl font-bold text-[#000935]">
-                  {TEXTS.couriers.register.title}
-                </h1>
+                <h1 className="text-2xl font-bold text-[#000935]">{TEXTS.couriers.register.title}</h1>
                 <Button
                   onClick={() => setShowForm(false)}
                   variant="ghost"
                   size="sm"
                   className="text-gray-500"
+                  disabled={formLoading}
                 >
                   <X className="h-5 w-5" />
                 </Button>
@@ -265,6 +270,8 @@ export function MensajerosLogin() {
                     onChange={handleFormChange}
                     placeholder={TEXTS.couriers.register.emailPlaceholder}
                     required
+                    disabled={formLoading}
+                    autoComplete="email"
                   />
                 </div>
 
@@ -277,6 +284,7 @@ export function MensajerosLogin() {
                     onChange={handleFormChange}
                     placeholder={TEXTS.couriers.register.namePlaceholder}
                     required
+                    disabled={formLoading}
                   />
                 </div>
 
@@ -289,6 +297,8 @@ export function MensajerosLogin() {
                     onChange={handleFormChange}
                     placeholder={TEXTS.couriers.register.phonePlaceholder}
                     required
+                    disabled={formLoading}
+                    autoComplete="tel"
                   />
                 </div>
 
@@ -297,6 +307,7 @@ export function MensajerosLogin() {
                   <Select
                     value={formData.ciudad}
                     onValueChange={(value) => handleSelectChange('ciudad', value)}
+                    disabled={formLoading}
                   >
                     <SelectTrigger id="ciudad">
                       <SelectValue placeholder={TEXTS.couriers.register.cityPlaceholder} />
@@ -316,6 +327,7 @@ export function MensajerosLogin() {
                   <Select
                     value={formData.vehiculo}
                     onValueChange={(value) => handleSelectChange('vehiculo', value)}
+                    disabled={formLoading}
                   >
                     <SelectTrigger id="vehiculo">
                       <SelectValue placeholder={TEXTS.couriers.register.vehiclePlaceholder} />
@@ -335,6 +347,7 @@ export function MensajerosLogin() {
                   <Select
                     value={formData.flotista}
                     onValueChange={(value) => handleSelectChange('flotista', value)}
+                    disabled={formLoading}
                   >
                     <SelectTrigger id="flotista">
                       <SelectValue placeholder={TEXTS.couriers.register.fleetPlaceholder} />

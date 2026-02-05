@@ -6,18 +6,17 @@ import logo from 'figma:asset/e80d7ef4ac3b9441721d6916cfc8ad34baf40db1.png';
 
 /**
  * COMPONENTE: Correo Enviado (confirmación) - Área Clientes
- * 
+ *
  * Pantalla de confirmación neutra tras solicitar recuperación.
  * No revela si el email existe o no en la base de datos.
  */
-
 export function CorreoEnviadoClientes() {
   const navigate = useNavigate();
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row">
       {/* Columna izquierda: Imagen */}
-      <div 
+      <div
         className="hidden md:block md:w-1/2 bg-cover bg-center relative"
         style={{ backgroundImage: `url(${backgroundImage})` }}
       >
@@ -43,11 +42,12 @@ export function CorreoEnviadoClientes() {
             <h1 className="text-2xl font-semibold text-[#000935] mb-4">
               CORREO ENVIADO
             </h1>
-            
-            {/* Mensaje neutro (no revela si el email existe) */}
+
+            {/* Mensaje neutro */}
             <div className="bg-[#00C9CE]/5 border border-[#00C9CE]/20 rounded-lg p-4 mb-8">
               <p className="text-gray-700 text-sm leading-relaxed">
-                Si existe una cuenta asociada a este correo, recibirás instrucciones para restablecer tu contraseña en unos minutos.
+                Si existe una cuenta asociada a este correo, recibirás instrucciones
+                para restablecer tu contraseña en unos minutos.
               </p>
             </div>
 

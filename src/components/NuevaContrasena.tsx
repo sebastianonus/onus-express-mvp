@@ -1,22 +1,28 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Button } from './ui/button';
 import { Loader2, Lock, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { createClient } from '@supabase/supabase-js';
 import backgroundImage from 'figma:asset/4261f3db5c66ef3456a8ebcae9838917a1e10ea5.png';
 import logo from 'figma:asset/e80d7ef4ac3b9441721d6916cfc8ad34baf40db1.png';
 
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+
+const supabase =
+  supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
+
 /**
  * COMPONENTE: Nueva Contraseña
- * 
+ *
  * Solo se muestra si hay token de Supabase en la URL (type=recovery).
- * Usa exclusivamente: supabase.auth.updateUser({ password })
- * 
- * NO guarda tokens, NO usa localStorage, NO lógica custom.
+ * Usa: supabase.auth.updateUser({ password })
+ *
+ * No guarda tokens, no usa localStorage, sin lógica custom de auth.
  */
-
 export function NuevaContrasena() {
   const navigate = useNavigate();
   const [password, setPassword] = useState('');
@@ -26,34 +32,26 @@ export function NuevaContrasena() {
   const [hasToken, setHasToken] = useState(false);
 
   useEffect(() => {
-    /**
-     * INTEGRACIÓN FUTURA:
-     * Verificar si hay token de recovery en la URL
-     * 
-     * const hashParams = new URLSearchParams(window.location.hash.substring(1));
-     * const type = hashParams.get('type');
-     * if (type === 'recovery') {
-     *   setHasToken(true);
-     * } else {
-     *   navigate('/mensajeros/acceso');
-     * }
-     */
-    
-    // Placeholder: permitir acceso para pruebas de UI
-    setHasToken(true);
+    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    const type = hashParams.get('type');
+
+    if (type === 'recovery') {
+      setHasToken(true);
+      return;
+    }
+
+    navigate('/mensajeros/acceso');
   }, [navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    // Validación básica de contraseñas coincidentes
     if (password !== confirmPassword) {
       setError('Las contraseñas no coinciden');
       return;
     }
 
-    // Validación básica de longitud
     if (password.length < 6) {
       setError('La contraseña debe tener al menos 6 caracteres');
       return;
@@ -62,30 +60,23 @@ export function NuevaContrasena() {
     setLoading(true);
 
     try {
-      /**
-       * INTEGRACIÓN FUTURA:
-       * await supabase.auth.updateUser({ password });
-       * 
-       * Si éxito:
-       * - Mostrar toast de éxito
-       * - Redirigir a login
-       * 
-       * NO guardar tokens
-       * NO localStorage
-       * NO lógica custom
-       */
-      
-      // Placeholder: mostrar que está pendiente de integración
-      toast.info('Función de actualización de contraseña pendiente de integración con Supabase Auth');
-      
-      // En producción, redirigir a login tras éxito
-      setTimeout(() => {
-        toast.success('Contraseña actualizada correctamente');
-        navigate('/mensajeros/acceso');
-      }, 1000);
-      
-    } catch (error) {
-      console.error('Error al actualizar contraseña:', error);
+      if (!supabase) {
+        setError('Configuración de Supabase incompleta');
+        return;
+      }
+
+      const { error: updateError } = await supabase.auth.updateUser({ password });
+
+      if (updateError) {
+        setError('Error al actualizar la contraseña. Intenta nuevamente.');
+        return;
+      }
+
+      toast.success('Contraseña actualizada correctamente');
+      await supabase.auth.signOut();
+      navigate('/mensajeros/acceso');
+    } catch (err) {
+      console.error('Error al actualizar contraseña:', err);
       setError('Error al actualizar la contraseña. Intenta nuevamente.');
     } finally {
       setLoading(false);
@@ -105,18 +96,15 @@ export function NuevaContrasena() {
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row">
-      {/* Columna izquierda: Imagen */}
-      <div 
+      <div
         className="hidden md:block md:w-1/2 bg-cover bg-center relative"
         style={{ backgroundImage: `url(${backgroundImage})` }}
       >
         <div className="absolute inset-0 bg-[#000935]/60" />
       </div>
 
-      {/* Columna derecha: Formulario */}
       <div className="w-full md:w-1/2 bg-white flex items-center justify-center p-6 md:p-12">
         <div className="w-full max-w-md">
-          {/* Logo */}
           <div className="flex justify-center mb-10">
             <img src={logo} alt="ONUS Express" className="h-14" />
           </div>
@@ -130,9 +118,11 @@ export function NuevaContrasena() {
             </p>
 
             <form onSubmit={handleSubmit} className="space-y-5">
-              {/* Nueva Contraseña */}
               <div>
-                <Label htmlFor="password" className="text-sm font-medium text-gray-700 mb-2 block">
+                <Label
+                  htmlFor="password"
+                  className="text-sm font-medium text-gray-700 mb-2 block"
+                >
                   Nueva Contraseña
                 </Label>
                 <div className="relative">
@@ -145,13 +135,17 @@ export function NuevaContrasena() {
                     placeholder="Mínimo 6 caracteres"
                     className="pl-10 h-11 border-gray-300 focus:border-[#00C9CE] focus:ring-[#00C9CE]"
                     required
+                    disabled={loading}
+                    autoComplete="new-password"
                   />
                 </div>
               </div>
 
-              {/* Confirmar Contraseña */}
               <div>
-                <Label htmlFor="confirmPassword" className="text-sm font-medium text-gray-700 mb-2 block">
+                <Label
+                  htmlFor="confirmPassword"
+                  className="text-sm font-medium text-gray-700 mb-2 block"
+                >
                   Confirmar Contraseña
                 </Label>
                 <div className="relative">
@@ -164,11 +158,12 @@ export function NuevaContrasena() {
                     placeholder="Repite tu contraseña"
                     className="pl-10 h-11 border-gray-300 focus:border-[#00C9CE] focus:ring-[#00C9CE]"
                     required
+                    disabled={loading}
+                    autoComplete="new-password"
                   />
                 </div>
               </div>
 
-              {/* Error */}
               {error && (
                 <div className="flex items-start gap-2 text-red-600 text-sm bg-red-50 p-3 rounded-md border border-red-200">
                   <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
@@ -197,6 +192,7 @@ export function NuevaContrasena() {
                 onClick={() => navigate('/mensajeros/acceso')}
                 variant="ghost"
                 className="text-sm text-gray-600 hover:text-gray-900"
+                disabled={loading}
               >
                 Volver al inicio de sesión
               </Button>

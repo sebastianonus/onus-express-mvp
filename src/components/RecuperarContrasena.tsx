@@ -5,18 +5,24 @@ import { Label } from './ui/label';
 import { Button } from './ui/button';
 import { Loader2, Mail } from 'lucide-react';
 import { toast } from 'sonner';
+import { createClient } from '@supabase/supabase-js';
 import backgroundImage from 'figma:asset/4261f3db5c66ef3456a8ebcae9838917a1e10ea5.png';
 import logo from 'figma:asset/e80d7ef4ac3b9441721d6916cfc8ad34baf40db1.png';
 
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+
+const supabase =
+  supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
+
 /**
  * COMPONENTE: Recuperar Contraseña
- * 
+ *
  * Solicita email para enviar instrucciones de recuperación.
- * Usa exclusivamente Supabase Auth: supabase.auth.resetPasswordForEmail()
- * 
+ * Usa Supabase Auth: supabase.auth.resetPasswordForEmail()
+ *
  * UX neutra: no revela si el email existe o no.
  */
-
 export function RecuperarContrasena() {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
@@ -27,24 +33,22 @@ export function RecuperarContrasena() {
     setLoading(true);
 
     try {
-      /**
-       * INTEGRACIÓN FUTURA:
-       * await supabase.auth.resetPasswordForEmail(email, {
-       *   redirectTo: `${window.location.origin}/mensajeros/nueva-contrasena`
-       * });
-       */
-      
-      // Placeholder: mostrar que está pendiente de integración
-      toast.info('Función de recuperación pendiente de integración con Supabase Auth');
-      
-      // En producción, redirigir a pantalla de confirmación
-      setTimeout(() => {
+      if (!supabase) {
+        toast.error('Configuración de Supabase incompleta');
         navigate('/mensajeros/correo-enviado');
-      }, 1000);
-      
+        return;
+      }
+
+      const redirectTo = `${window.location.origin}/mensajeros/nueva-contrasena`;
+
+      await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+
+      // UX neutra: siempre mismo mensaje y misma ruta
+      toast.success('Si el correo existe, recibirás un email con instrucciones.');
+      navigate('/mensajeros/correo-enviado');
     } catch (error) {
       console.error('Error en recuperación:', error);
-      // En producción, siempre redirigir (UX neutra)
+      // UX neutra: siempre redirigir igual
       navigate('/mensajeros/correo-enviado');
     } finally {
       setLoading(false);
@@ -53,18 +57,15 @@ export function RecuperarContrasena() {
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row">
-      {/* Columna izquierda: Imagen */}
-      <div 
+      <div
         className="hidden md:block md:w-1/2 bg-cover bg-center relative"
         style={{ backgroundImage: `url(${backgroundImage})` }}
       >
         <div className="absolute inset-0 bg-[#000935]/60" />
       </div>
 
-      {/* Columna derecha: Formulario */}
       <div className="w-full md:w-1/2 bg-white flex items-center justify-center p-6 md:p-12">
         <div className="w-full max-w-md">
-          {/* Logo */}
           <div className="flex justify-center mb-10">
             <img src={logo} alt="ONUS Express" className="h-14" />
           </div>
@@ -79,7 +80,10 @@ export function RecuperarContrasena() {
 
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
-                <Label htmlFor="email" className="text-sm font-medium text-gray-700 mb-2 block">
+                <Label
+                  htmlFor="email"
+                  className="text-sm font-medium text-gray-700 mb-2 block"
+                >
                   Correo Electrónico
                 </Label>
                 <div className="relative">
@@ -92,6 +96,8 @@ export function RecuperarContrasena() {
                     placeholder="tu@email.com"
                     className="pl-10 h-11 border-gray-300 focus:border-[#00C9CE] focus:ring-[#00C9CE]"
                     required
+                    disabled={loading}
+                    autoComplete="email"
                   />
                 </div>
               </div>
@@ -117,6 +123,7 @@ export function RecuperarContrasena() {
                 onClick={() => navigate('/mensajeros/acceso')}
                 variant="ghost"
                 className="text-sm text-gray-600 hover:text-gray-900 font-medium"
+                disabled={loading}
               >
                 Volver al inicio de sesión
               </Button>
