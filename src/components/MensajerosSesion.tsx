@@ -87,6 +87,7 @@ interface MensajeroAuth {
 interface Campana {
   id: string;
   nombre: string;
+  logoUrl?: string;
   descripcion: string;
   ciudad: string;
   vehiculo: string;
@@ -186,6 +187,11 @@ export function MensajerosSesion() {
         const mapped: Campana[] = (campanasData ?? []).map((c: any) => ({
           id: c.id,
           nombre: c.nombre ?? c.titulo ?? c.title ?? 'Campaña',
+          logoUrl:
+            typeof (c.logo_url ?? c.logo ?? c.logoUrl) === 'string' &&
+            String(c.logo_url ?? c.logo ?? c.logoUrl).trim() !== ''
+              ? String(c.logo_url ?? c.logo ?? c.logoUrl).trim()
+              : undefined,
           descripcion: c.descripcion ?? c.description ?? 'Sin descripción',
           ciudad: c.ciudad ?? c.city ?? '—',
           vehiculo: Array.isArray(c.vehiculos ?? c.vehicles) && (c.vehiculos ?? c.vehicles).length === 1
