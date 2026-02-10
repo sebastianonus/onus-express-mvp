@@ -353,3 +353,8 @@ WHERE p.user_id = auth.uid();
 - Se actualizo logout del panel para cerrar sesion admin y redirigir al login.
 - Se agrego Edge Function `admin-login` para validacion server-side del PIN usando el secret `ADMIN_PIN`.
 - Build de produccion validado correctamente con `npm run build`.
+
+## Actualizacion 2026-02-10 - Textos Cliente
+
+- Se corrigio valor invalido en `src/content/texts.ts` para `clients.form.labels.testCode`.
+- Se dejo el texto de prueba como cadena vacia para evitar error de compilacion.

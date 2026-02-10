@@ -308,7 +308,7 @@ export const TEXTS = {
         accessButton: "Acceder a Tarifarios",
         noCode: "¿No tiene un cuenta de cliente?",
         requestAccess: "Solicitar Acceso",
-        testCode: "Código de prueba: 000000",
+        testCode: "",
       },
     },
     errors: {
