@@ -151,7 +151,7 @@ export function CampanaDetalleView({ campaignId, onBack }: CampanaDetalleViewPro
           id: String(row.id),
           user_id: userId,
           campaign_id: String(row.campaign_id ?? campaignId),
-          mensajeroNombre: userId || 'Mensajero',
+          mensajeroNombre: userId || TEXTS.admin.campanaDetalle.defaults.courierName,
           mensajeroEmail: '',
           mensajeroTelefono: '',
           fecha: String(row.created_at ?? new Date().toISOString()),
@@ -196,7 +196,7 @@ export function CampanaDetalleView({ campaignId, onBack }: CampanaDetalleViewPro
 
   const handleWhatsApp = (postulacion: Postulacion) => {
     if (!postulacion.mensajeroTelefono) {
-      toast.error('No hay teléfono disponible para este mensajero');
+      toast.error(TEXTS.admin.campanaDetalle.toasts.missingPhone);
       return;
     }
 
@@ -571,7 +571,7 @@ export function CampanaDetalleView({ campaignId, onBack }: CampanaDetalleViewPro
               {/* Acciones */}
               <div className="pt-4 border-t border-gray-200 space-y-3">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-xs text-gray-600 uppercase tracking-wide">Estado:</span>
+                  <span className="text-xs text-gray-600 uppercase tracking-wide">{TEXTS.admin.campanaDetalle.actions.statusLabel}</span>
                   <Button
                     size="sm"
                     variant={postulacion.estado === 'En revisiÃ³n' ? 'default' : 'outline'}
@@ -583,7 +583,7 @@ export function CampanaDetalleView({ campaignId, onBack }: CampanaDetalleViewPro
                         : 'h-8 rounded-full border-yellow-300 text-yellow-700 hover:bg-yellow-50'
                     }
                   >
-                    En revisiÃ³n
+                    {TEXTS.admin.campanaDetalle.actions.setInReview}
                   </Button>
                   <Button
                     size="sm"
@@ -596,7 +596,7 @@ export function CampanaDetalleView({ campaignId, onBack }: CampanaDetalleViewPro
                         : 'h-8 rounded-full border-green-300 text-green-700 hover:bg-green-50'
                     }
                   >
-                    Aceptado
+                    {TEXTS.admin.campanaDetalle.actions.setAccepted}
                   </Button>
                   <Button
                     size="sm"
@@ -609,7 +609,7 @@ export function CampanaDetalleView({ campaignId, onBack }: CampanaDetalleViewPro
                         : 'h-8 rounded-full border-red-300 text-red-700 hover:bg-red-50'
                     }
                   >
-                    Rechazado
+                    {TEXTS.admin.campanaDetalle.actions.setRejected}
                   </Button>
                 </div>
 
@@ -631,5 +631,3 @@ export function CampanaDetalleView({ campaignId, onBack }: CampanaDetalleViewPro
     </div>
   );
 }
-
-

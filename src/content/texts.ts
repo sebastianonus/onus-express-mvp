@@ -1237,6 +1237,10 @@ export const TEXTS = {
         accept: "Aceptar",
         reject: "Rechazar",
         notifyWhatsApp: "Notificar por WhatsApp",
+        statusLabel: "Estado:",
+        setInReview: "En revisión",
+        setAccepted: "Aceptado",
+        setRejected: "Rechazado",
       },
       
       labels: {
@@ -1285,6 +1289,11 @@ export const TEXTS = {
         exportError: "Error al exportar los datos",
         updatePendingIntegration: "Función de actualización pendiente de integración con backend",
         exportPendingIntegration: "Exportación CSV: pendiente de integración con datos reales",
+        missingPhone: "No hay teléfono disponible para este mensajero",
+      },
+
+      defaults: {
+        courierName: "Mensajero",
       },
     },
 
