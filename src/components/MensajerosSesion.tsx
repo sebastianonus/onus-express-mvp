@@ -129,7 +129,7 @@ export function MensajerosSesion() {
   useEffect(() => {
     const init = async () => {
       if (!supabase) {
-        toast.error('Configuración de Supabase incompleta');
+        toast.error(TEXTS.couriers.session.errors.supabaseConfigError);
         navigate('/mensajeros/acceso');
         return;
       }
@@ -709,7 +709,11 @@ export function MensajerosSesion() {
                 <div className="flex gap-3">
                   <Button
                     onClick={() => {
-                      const mensaje = `Hola! Me interesa la campaña: ${selectedCampaign.nombre}. Mi nombre es ${mensajero.nombre} (Código: ${mensajero.codigo}). ${TEXTS.couriers.session.modals.details.whatsappMessageEnd}`;
+                      const mensaje = TEXTS.couriers.session.modals.details.whatsappMessageTemplate
+                        .replace('{campaign}', selectedCampaign.nombre)
+                        .replace('{name}', mensajero.nombre)
+                        .replace('{code}', mensajero.codigo)
+                        .replace('{ending}', TEXTS.couriers.session.modals.details.whatsappMessageEnd);
                       window.open(
                         `https://wa.me/34676728527?text=${encodeURIComponent(mensaje)}`,
                         '_blank'
@@ -775,7 +779,7 @@ export function MensajerosSesion() {
                   e.preventDefault();
 
                   if (!supabase) {
-                    toast.error('Configuración de Supabase incompleta');
+                    toast.error(TEXTS.couriers.session.errors.supabaseConfigError);
                     return;
                   }
 
@@ -797,11 +801,11 @@ export function MensajerosSesion() {
                   const { error } = await supabase.from('postulaciones').insert(payload);
 
                   if (error) {
-                    toast.error('No se pudo enviar la postulación. Intenta nuevamente.');
+                    toast.error(TEXTS.couriers.session.errors.applyFailed);
                     return;
                   }
 
-                  toast.success('Postulación enviada');
+                  toast.success(TEXTS.couriers.session.toasts.applicationSent);
                   setPostulaciones((prev) => Array.from(new Set([...prev, selectedCampaign.id])));
                   setShowFormModal(false);
                   setFormData({ motivacion: '', experiencia: '', disponibilidad: '' });

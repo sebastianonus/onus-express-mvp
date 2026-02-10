@@ -55,13 +55,13 @@ export function MensajerosLogin() {
 
     try {
       if (!supabase) {
-        setLoginError('Configuración de Supabase incompleta');
+        setLoginError(TEXTS.couriers.login.feedback.errors.supabaseConfigError);
         return;
       }
 
       const emailTrimmed = email.trim();
       if (!emailTrimmed) {
-        setLoginError(TEXTS.couriers?.login?.errors?.emailRequired ?? 'Introduce un email válido');
+        setLoginError(TEXTS.couriers.login.feedback.errors.emailRequired);
         return;
       }
 
@@ -73,14 +73,14 @@ export function MensajerosLogin() {
       });
 
       if (error) {
-        setLoginError('No se pudo enviar el enlace. Revisa el email e inténtalo de nuevo.');
+        setLoginError(TEXTS.couriers.login.feedback.errors.magicLinkFailed);
         return;
       }
 
-      toast.success('Revisa tu correo: te enviamos un enlace de acceso.');
+      toast.success(TEXTS.couriers.login.feedback.linkSentToast);
     } catch (err) {
       console.error('Error en login:', err);
-      setLoginError('No se pudo enviar el enlace. Intenta nuevamente.');
+      setLoginError(TEXTS.couriers.login.feedback.errors.magicLinkRetry);
     } finally {
       setLoading(false);
     }
@@ -101,7 +101,7 @@ export function MensajerosLogin() {
 
     try {
       if (!supabase) {
-        toast.error('Configuración de Supabase incompleta');
+        toast.error(TEXTS.couriers.login.feedback.errors.supabaseConfigError);
         return;
       }
 
@@ -117,11 +117,11 @@ export function MensajerosLogin() {
       const { error } = await supabase.from('solicitudes_mensajeros').insert(payload);
 
       if (error) {
-        toast.error('No se pudo enviar la solicitud. Intenta nuevamente.');
+        toast.error(TEXTS.couriers.login.feedback.errors.registerFailed);
         return;
       }
 
-      toast.success('Solicitud enviada. Te contactaremos a la mayor brevedad.');
+      toast.success(TEXTS.couriers.login.feedback.registerRequestSentToast);
       setShowForm(false);
 
       setFormData({
@@ -134,7 +134,7 @@ export function MensajerosLogin() {
       });
     } catch (err) {
       console.error('Error en registro:', err);
-      toast.error('Error al registrar. Intenta nuevamente.');
+      toast.error(TEXTS.couriers.login.feedback.errors.registerUnexpectedError);
     } finally {
       setFormLoading(false);
     }
@@ -152,7 +152,7 @@ export function MensajerosLogin() {
       <div className="w-full md:w-1/2 bg-white flex items-center justify-center p-6 md:p-12">
         <div className="w-full max-w-md">
           <div className="flex justify-center mb-10">
-            <img src={logo} alt="ONUS Express" className="h-14" />
+            <img src={logo} alt={TEXTS.header.a11y.logoAlt} className="h-14" />
           </div>
 
           {!showForm ? (
@@ -215,7 +215,7 @@ export function MensajerosLogin() {
                     className="text-sm text-gray-600 hover:text-[#00C9CE]"
                     disabled={loading}
                   >
-                    ¿Olvidaste tu contraseña?
+                    {TEXTS.couriers.login.forgotPassword}
                   </Button>
                 </div>
               </form>

@@ -7,6 +7,7 @@ import { Loader2, Lock, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import backgroundImage from 'figma:asset/433f006a1a8dbb744643830e0e0b3f07184d05b1.png';
 import logo from 'figma:asset/e80d7ef4ac3b9441721d6916cfc8ad34baf40db1.png';
+import { TEXTS } from '@/content/texts';
 
 /**
  * COMPONENTE: Nueva Contraseña - Área Clientes
@@ -49,13 +50,13 @@ export function NuevaContrasenaClientes() {
 
     // Validación básica de contraseñas coincidentes
     if (password !== confirmPassword) {
-      setError('Las contraseñas no coinciden');
+      setError(TEXTS.clients.newPassword.errors.noMatch);
       return;
     }
 
     // Validación básica de longitud
     if (password.length < 6) {
-      setError('La contraseña debe tener al menos 6 caracteres');
+      setError(TEXTS.clients.newPassword.errors.minLength);
       return;
     }
 
@@ -76,17 +77,17 @@ export function NuevaContrasenaClientes() {
        */
       
       // Placeholder: mostrar que está pendiente de integración
-      toast.info('Función de actualización de contraseña pendiente de integración con Supabase Auth');
+      toast.info(TEXTS.clients.newPassword.toasts.pendingIntegration);
       
       // En producción, redirigir a login tras éxito
       setTimeout(() => {
-        toast.success('Contraseña actualizada correctamente');
+        toast.success(TEXTS.clients.newPassword.toasts.updated);
         navigate('/clientes');
       }, 1000);
       
     } catch (error) {
       console.error('Error al actualizar contraseña:', error);
-      setError('Error al actualizar la contraseña. Intenta nuevamente.');
+      setError(TEXTS.clients.newPassword.errors.updateFailed);
     } finally {
       setLoading(false);
     }
@@ -97,7 +98,7 @@ export function NuevaContrasenaClientes() {
       <div className="min-h-screen flex items-center justify-center bg-white">
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-[#00C9CE]" />
-          <p className="text-gray-600">Verificando...</p>
+          <p className="text-gray-600">{TEXTS.clients.newPassword.verifying}</p>
         </div>
       </div>
     );
@@ -118,22 +119,22 @@ export function NuevaContrasenaClientes() {
         <div className="w-full max-w-md">
           {/* Logo */}
           <div className="flex justify-center mb-10">
-            <img src={logo} alt="ONUS Express" className="h-14" />
+            <img src={logo} alt={TEXTS.header.a11y.logoAlt} className="h-14" />
           </div>
 
           <div>
             <h1 className="text-2xl font-semibold text-[#000935] mb-2 text-center">
-              NUEVA CONTRASEÑA
+              {TEXTS.clients.newPassword.title}
             </h1>
             <p className="text-gray-500 text-sm mb-8 text-center">
-              Ingresa tu nueva contraseña para restablecer el acceso a tu cuenta.
+              {TEXTS.clients.newPassword.subtitle}
             </p>
 
             <form onSubmit={handleSubmit} className="space-y-5">
               {/* Nueva Contraseña */}
               <div>
                 <Label htmlFor="password" className="text-sm font-medium text-gray-700 mb-2 block">
-                  Nueva Contraseña
+                  {TEXTS.clients.newPassword.passwordLabel}
                 </Label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -142,7 +143,7 @@ export function NuevaContrasenaClientes() {
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Mínimo 6 caracteres"
+                    placeholder={TEXTS.clients.newPassword.passwordPlaceholder}
                     className="pl-10 h-11 border-gray-300 focus:border-[#00C9CE] focus:ring-[#00C9CE]"
                     required
                   />
@@ -152,7 +153,7 @@ export function NuevaContrasenaClientes() {
               {/* Confirmar Contraseña */}
               <div>
                 <Label htmlFor="confirmPassword" className="text-sm font-medium text-gray-700 mb-2 block">
-                  Confirmar Contraseña
+                  {TEXTS.clients.newPassword.confirmPasswordLabel}
                 </Label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -161,7 +162,7 @@ export function NuevaContrasenaClientes() {
                     type="password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="Repite tu contraseña"
+                    placeholder={TEXTS.clients.newPassword.confirmPasswordPlaceholder}
                     className="pl-10 h-11 border-gray-300 focus:border-[#00C9CE] focus:ring-[#00C9CE]"
                     required
                   />
@@ -184,10 +185,10 @@ export function NuevaContrasenaClientes() {
                 {loading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Actualizando...
+                    {TEXTS.clients.newPassword.updatingButton}
                   </>
                 ) : (
-                  'Actualizar Contraseña'
+                  TEXTS.clients.newPassword.updateButton
                 )}
               </Button>
             </form>
@@ -198,7 +199,7 @@ export function NuevaContrasenaClientes() {
                 variant="ghost"
                 className="text-sm text-gray-600 hover:text-gray-900"
               >
-                Volver al inicio de sesión
+                {TEXTS.clients.newPassword.backToLogin}
               </Button>
             </div>
           </div>

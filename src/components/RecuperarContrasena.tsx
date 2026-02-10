@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { createClient } from '@supabase/supabase-js';
 import backgroundImage from 'figma:asset/4261f3db5c66ef3456a8ebcae9838917a1e10ea5.png';
 import logo from 'figma:asset/e80d7ef4ac3b9441721d6916cfc8ad34baf40db1.png';
+import { TEXTS } from '@/content/texts';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
@@ -34,7 +35,7 @@ export function RecuperarContrasena() {
 
     try {
       if (!supabase) {
-        toast.error('Configuración de Supabase incompleta');
+        toast.error(TEXTS.couriers.recovery.supabaseConfigError);
         navigate('/mensajeros/correo-enviado');
         return;
       }
@@ -44,7 +45,7 @@ export function RecuperarContrasena() {
       await supabase.auth.resetPasswordForEmail(email, { redirectTo });
 
       // UX neutra: siempre mismo mensaje y misma ruta
-      toast.success('Si el correo existe, recibirás un email con instrucciones.');
+      toast.success(TEXTS.couriers.recovery.neutralSuccessToast);
       navigate('/mensajeros/correo-enviado');
     } catch (error) {
       console.error('Error en recuperación:', error);
@@ -67,15 +68,15 @@ export function RecuperarContrasena() {
       <div className="w-full md:w-1/2 bg-white flex items-center justify-center p-6 md:p-12">
         <div className="w-full max-w-md">
           <div className="flex justify-center mb-10">
-            <img src={logo} alt="ONUS Express" className="h-14" />
+            <img src={logo} alt={TEXTS.header.a11y.logoAlt} className="h-14" />
           </div>
 
           <div>
             <h1 className="text-2xl font-semibold text-[#000935] mb-2 text-center">
-              RECUPERAR CONTRASEÑA
+              {TEXTS.couriers.recovery.title}
             </h1>
             <p className="text-gray-500 text-sm mb-8 text-center">
-              Ingresa tu correo electrónico y te enviaremos instrucciones para restablecer tu contraseña.
+              {TEXTS.couriers.recovery.subtitle}
             </p>
 
             <form onSubmit={handleSubmit} className="space-y-5">
@@ -84,7 +85,7 @@ export function RecuperarContrasena() {
                   htmlFor="email"
                   className="text-sm font-medium text-gray-700 mb-2 block"
                 >
-                  Correo Electrónico
+                  {TEXTS.couriers.recovery.emailLabel}
                 </Label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -93,7 +94,7 @@ export function RecuperarContrasena() {
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="tu@email.com"
+                    placeholder={TEXTS.couriers.recovery.emailPlaceholder}
                     className="pl-10 h-11 border-gray-300 focus:border-[#00C9CE] focus:ring-[#00C9CE]"
                     required
                     disabled={loading}
@@ -110,10 +111,10 @@ export function RecuperarContrasena() {
                 {loading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Enviando...
+                    {TEXTS.couriers.recovery.sendingButton}
                   </>
                 ) : (
-                  'Enviar Instrucciones'
+                  TEXTS.couriers.recovery.sendButton
                 )}
               </Button>
             </form>
@@ -125,7 +126,7 @@ export function RecuperarContrasena() {
                 className="text-sm text-gray-600 hover:text-gray-900 font-medium"
                 disabled={loading}
               >
-                Volver al inicio de sesión
+                {TEXTS.couriers.recovery.backToLogin}
               </Button>
             </div>
           </div>

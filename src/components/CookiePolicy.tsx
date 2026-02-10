@@ -11,7 +11,7 @@ export function CookiePolicy() {
   const handleSavePreferences = () => {
     saveCookieConsent(analytics, marketing);
     initTracking();
-    toast.info('Preferencias de cookies guardadas');
+    toast.info(TEXTS.legal.cookies.sections.manage.savedToast);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 

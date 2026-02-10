@@ -334,6 +334,43 @@ export const TEXTS = {
       tipLabel: "💡 Consejo:",
       tipText: "Puede cambiar entre tarifarios en cualquier momento usando los botones en la parte superior de la página.",
     },
+    recovery: {
+      title: "RECUPERAR CONTRASEÑA",
+      subtitle: "Ingresa tu correo electrónico y te enviaremos instrucciones para restablecer tu contraseña.",
+      emailLabel: "Correo Electrónico",
+      emailPlaceholder: "tu@email.com",
+      sendButton: "Enviar Instrucciones",
+      sendingButton: "Enviando...",
+      backToLogin: "Volver al inicio de sesión",
+      neutralSuccessToast: "Si el correo existe, recibirás un email con instrucciones.",
+      supabaseConfigError: "Configuración de Supabase incompleta",
+    },
+    newPassword: {
+      title: "NUEVA CONTRASEÑA",
+      subtitle: "Ingresa tu nueva contraseña para restablecer el acceso a tu cuenta.",
+      passwordLabel: "Nueva Contraseña",
+      passwordPlaceholder: "Mínimo 6 caracteres",
+      confirmPasswordLabel: "Confirmar Contraseña",
+      confirmPasswordPlaceholder: "Repite tu contraseña",
+      updateButton: "Actualizar Contraseña",
+      updatingButton: "Actualizando...",
+      backToLogin: "Volver al inicio de sesión",
+      verifying: "Verificando...",
+      errors: {
+        noMatch: "Las contraseñas no coinciden",
+        minLength: "La contraseña debe tener al menos 6 caracteres",
+        updateFailed: "Error al actualizar la contraseña. Intenta nuevamente.",
+      },
+      toasts: {
+        pendingIntegration: "Función de actualización de contraseña pendiente de integración con Supabase Auth",
+        updated: "Contraseña actualizada correctamente",
+      },
+    },
+    emailSent: {
+      title: "CORREO ENVIADO",
+      message: "Si existe una cuenta asociada a este correo, recibirás instrucciones para restablecer tu contraseña en unos minutos.",
+      backToLogin: "Volver al inicio de sesión",
+    },
   },
   couriers: {
     login: {
@@ -402,7 +439,15 @@ export const TEXTS = {
         errors: {
           invalidOrInactiveCode: "El código no es válido o está inactivo.",
           verifyCodeError: "Error al verificar el código",
+          emailRequired: "Introduce un email válido",
+          supabaseConfigError: "Configuración de Supabase incompleta",
+          magicLinkFailed: "No se pudo enviar el enlace. Revisa el email e inténtalo de nuevo.",
+          magicLinkRetry: "No se pudo enviar el enlace. Intenta nuevamente.",
+          registerFailed: "No se pudo enviar la solicitud. Intenta nuevamente.",
+          registerUnexpectedError: "Error al registrar. Intenta nuevamente.",
         },
+        linkSentToast: "Revisa tu correo: te enviamos un enlace de acceso.",
+        registerRequestSentToast: "Solicitud enviada. Te contactaremos a la mayor brevedad.",
         success: {
           title: "¡Enlace enviado!",
           message: "Hemos enviado un enlace de acceso a {email}. Revisa tu correo.",
@@ -532,6 +577,7 @@ export const TEXTS = {
           createdOn: "Campaña creada el",
           whatsappButton: "Hablar por WhatsApp",
           whatsappMessageEnd: "Me gustaría obtener más información.",
+          whatsappMessageTemplate: "Hola! Me interesa la campaña: {campaign}. Mi nombre es {name} (Código: {code}). {ending}",
         },
         application: {
           title: "Aplicar a:",
@@ -564,6 +610,50 @@ export const TEXTS = {
         searchCampaigns: "Buscar campañas",
         sendApplication: "Enviar Solicitud",
       },
+      errors: {
+        supabaseConfigError: "Configuración de Supabase incompleta",
+        applyFailed: "No se pudo enviar la postulación. Intenta nuevamente.",
+      },
+      toasts: {
+        applicationSent: "Postulación enviada",
+      },
+    },
+    recovery: {
+      title: "RECUPERAR CONTRASEÑA",
+      subtitle: "Ingresa tu correo electrónico y te enviaremos instrucciones para restablecer tu contraseña.",
+      emailLabel: "Correo Electrónico",
+      emailPlaceholder: "tu@email.com",
+      sendButton: "Enviar Instrucciones",
+      sendingButton: "Enviando...",
+      backToLogin: "Volver al inicio de sesión",
+      neutralSuccessToast: "Si el correo existe, recibirás un email con instrucciones.",
+      supabaseConfigError: "Configuración de Supabase incompleta",
+    },
+    newPassword: {
+      title: "NUEVA CONTRASEÑA",
+      subtitle: "Ingresa tu nueva contraseña para restablecer el acceso a tu cuenta.",
+      passwordLabel: "Nueva Contraseña",
+      passwordPlaceholder: "Mínimo 6 caracteres",
+      confirmPasswordLabel: "Confirmar Contraseña",
+      confirmPasswordPlaceholder: "Repite tu contraseña",
+      updateButton: "Actualizar Contraseña",
+      updatingButton: "Actualizando...",
+      backToLogin: "Volver al inicio de sesión",
+      verifying: "Verificando...",
+      errors: {
+        noMatch: "Las contraseñas no coinciden",
+        minLength: "La contraseña debe tener al menos 6 caracteres",
+        updateFailed: "Error al actualizar la contraseña. Intenta nuevamente.",
+        supabaseConfigError: "Configuración de Supabase incompleta",
+      },
+      toasts: {
+        updated: "Contraseña actualizada correctamente",
+      },
+    },
+    emailSent: {
+      title: "CORREO ENVIADO",
+      message: "Si existe una cuenta asociada a este correo, recibirás instrucciones para restablecer tu contraseña en unos minutos.",
+      backToLogin: "Volver al inicio de sesión",
     },
     campaignCard: {
       requirementsLabel: "REQUISITOS:",
@@ -753,6 +843,7 @@ export const TEXTS = {
           marketingSubtitle: "Meta Pixel (Facebook/Instagram)",
 
           saveButton: "Guardar preferencias",
+          savedToast: "Preferencias de cookies guardadas",
         },
 
         browser: {
@@ -1192,6 +1283,8 @@ export const TEXTS = {
         applicationRejected: "Postulación rechazada correctamente",
         exportSuccess: "{count} postulaciones exportadas correctamente",
         exportError: "Error al exportar los datos",
+        updatePendingIntegration: "Función de actualización pendiente de integración con backend",
+        exportPendingIntegration: "Exportación CSV: pendiente de integración con datos reales",
       },
     },
 
@@ -1264,6 +1357,7 @@ export const TEXTS = {
         pinPlaceholder: "Introduce el PIN",
         pinHelp: "Soporta letras, números y caracteres especiales",
         accessButton: "Acceder",
+        accessing: "Accediendo...",
         backToSite: "← Volver a la web",
         pinError: "PIN incorrecto. Inténtalo de nuevo.",
       },
@@ -1414,6 +1508,17 @@ export const TEXTS = {
           bulkDeactivatedPrefix: "✅ ",
           bulkDeactivatedSuffix: " campaña(s) desactivada(s)",
         },
+        info: {
+          pendingBackendGeneric: "Función pendiente de integración con backend",
+          pendingUpdateCampaign: "Actualización de campaña pendiente de integración con backend",
+          pendingCreateCampaign: "Creación de campaña pendiente de integración con backend",
+          pendingDeleteCampaign: "Eliminación de campaña pendiente de integración con backend",
+          pendingDuplicateCampaign: "Duplicación de campaña pendiente de integración con backend",
+          pendingActivatePrefix: "Activación de ",
+          pendingActivateSuffix: " campañas pendiente de integración con backend",
+          pendingDeactivatePrefix: "Desactivación de ",
+          pendingDeactivateSuffix: " campañas pendiente de integración con backend",
+        },
         confirms: {
           deleteAll: "⚠️ ¿Estás seguro de que quieres eliminar TODAS las campañas? Esta acción no se puede deshacer.",
           deleteOne: "¿Eliminar esta campaña?",
@@ -1487,6 +1592,16 @@ export const TEXTS = {
         formatsNote: "Formatos: PNG, JPG, SVG",
         loaded: "Logo cargado",
         labelGeneric: "Logo del cliente",
+      },
+      actions: {
+        delete: "Eliminar",
+        deleteLogo: "Eliminar logo",
+      },
+      alerts: {
+        pdfError: "Error al generar el PDF. Por favor, intenta de nuevo.",
+        hoyContact: "Para el servicio HOY, por favor contacte con nuestro equipo comercial.",
+        logoTooLarge: "El archivo es demasiado grande. Tamaño máximo: 5MB",
+        logoLoadError: "Error al cargar el logo. Intenta con otro archivo.",
       },
     },
 

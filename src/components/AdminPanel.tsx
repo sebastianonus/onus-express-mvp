@@ -15,7 +15,12 @@ import { toast } from 'sonner@2.0.3';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
 import { TEXTS } from '@/content/texts';
 import { useRequireRole } from '../hooks/useRequireRole';
-import { clearAdminSession } from '../utils/adminAuth';
+import { supabase } from '../supabase';
+import {
+  clearAdminSession,
+  isAdminSessionActive,
+  setAdminSession,
+} from '../utils/adminAuth';
 
 /**
  * COMPONENTE: Panel de Administración - Frontend limpio sin backend
@@ -51,6 +56,11 @@ interface Campaign {
 export function AdminPanel() {
   // Guard de rol: solo admins pueden acceder
   useRequireRole('admin');
+
+  const [isAuthenticated, setIsAuthenticated] = useState(isAdminSessionActive());
+  const [pin, setPin] = useState('');
+  const [pinError, setPinError] = useState('');
+  const [authLoading, setAuthLoading] = useState(false);
   
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [showModal, setShowModal] = useState(false);
@@ -143,8 +153,91 @@ export function AdminPanel() {
 
   const handleLogout = () => {
     clearAdminSession();
+    setIsAuthenticated(false);
     navigate('/admin');
   };
+
+  const handlePinSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPinError('');
+
+    if (!pin.trim()) {
+      setPinError(TEXTS.admin.panel.login.pinError);
+      return;
+    }
+
+    setAuthLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-login', {
+        body: { pin: pin.trim() },
+      });
+
+      if (error || !data?.ok) {
+        setPinError(TEXTS.admin.panel.login.pinError);
+        return;
+      }
+
+      setAdminSession();
+      setIsAuthenticated(true);
+      setPin('');
+    } catch {
+      setPinError(TEXTS.admin.panel.login.pinError);
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#000935] px-4">
+        <div className="w-full max-w-md">
+          <div className="bg-white rounded-2xl shadow-2xl p-8">
+            <div className="flex items-center justify-center mb-6">
+              <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ backgroundColor: '#00C9CE' }}>
+                <Shield className="w-8 h-8 text-[#000935]" />
+              </div>
+            </div>
+            <h1 className="text-center text-[#000935] mb-2">
+              {TEXTS.admin.panel.login.title}
+            </h1>
+
+            <form onSubmit={handlePinSubmit} className="space-y-6">
+              <div>
+                <Label htmlFor="pin" className="text-[#000935]">
+                  {TEXTS.admin.panel.login.pinLabel}
+                </Label>
+                <Input
+                  id="pin"
+                  type="password"
+                  value={pin}
+                  onChange={(e) => setPin(e.target.value)}
+                  placeholder={TEXTS.admin.panel.login.pinPlaceholder}
+                  className="mt-1 h-11 border-0 bg-[#E8E8E8] focus-visible:ring-[#00C9CE]"
+                  autoFocus
+                />
+                <p className="text-xs text-gray-500 mt-1">{TEXTS.admin.panel.login.pinHelp}</p>
+                {pinError && <p className="text-red-500 text-sm mt-2">{pinError}</p>}
+              </div>
+
+              <Button
+                type="submit"
+                disabled={authLoading}
+                className="w-full h-11 rounded-lg bg-[#00C9CE] hover:bg-[#00B5BA] text-[#000935]"
+              >
+                {authLoading ? TEXTS.admin.panel.login.accessing : TEXTS.admin.panel.login.accessButton}
+              </Button>
+
+              <div className="text-center pt-6">
+                <Link to="/" className="text-sm text-gray-600 hover:text-[#00C9CE] transition-colors">
+                  {TEXTS.admin.panel.login.backToSite}
+                </Link>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const deleteAllCampaigns = () => {
     if (!confirm(TEXTS.admin.panel.messages.confirms.deleteAll)) {
@@ -159,7 +252,7 @@ export function AdminPanel() {
      */
     setCampaigns([]);
     setSelectedCampaigns(new Set());
-    toast.info('Función pendiente de integración con backend');
+    toast.info(TEXTS.admin.panel.messages.info.pendingBackendGeneric);
   };
 
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -212,11 +305,11 @@ export function AdminPanel() {
       if (editingCampaign) {
         // Actualizar campaña existente
         updatedCampaigns = campaigns.map(c => c.id === campaignId ? campaignData : c);
-        toast.info('Actualización de campaña pendiente de integración con backend');
+        toast.info(TEXTS.admin.panel.messages.info.pendingUpdateCampaign);
       } else {
         // Crear nueva campaña
         updatedCampaigns = [...campaigns, campaignData];
-        toast.info('Creación de campaña pendiente de integración con backend');
+        toast.info(TEXTS.admin.panel.messages.info.pendingCreateCampaign);
       }
 
       setCampaigns(updatedCampaigns);
@@ -237,7 +330,7 @@ export function AdminPanel() {
     const updatedCampaigns = campaigns.filter(c => c.id !== id);
     setCampaigns(updatedCampaigns);
     saveCampaigns(updatedCampaigns);
-    toast.info('Eliminación de campaña pendiente de integración con backend');
+    toast.info(TEXTS.admin.panel.messages.info.pendingDeleteCampaign);
   };
 
   const handleEdit = (campaign: Campaign) => {
@@ -276,7 +369,7 @@ export function AdminPanel() {
     const updatedCampaigns = [...campaigns, duplicateCampaign];
     setCampaigns(updatedCampaigns);
     saveCampaigns(updatedCampaigns);
-    toast.info('Duplicación de campaña pendiente de integración con backend');
+    toast.info(TEXTS.admin.panel.messages.info.pendingDuplicateCampaign);
   };
 
   const resetForm = () => {
@@ -336,7 +429,9 @@ export function AdminPanel() {
     setCampaigns(updatedCampaigns);
     saveCampaigns(updatedCampaigns);
     setSelectedCampaigns(new Set());
-    toast.info(`Activación de ${idsToActivate.length} campañas pendiente de integración con backend`);
+    toast.info(
+      `${TEXTS.admin.panel.messages.info.pendingActivatePrefix}${idsToActivate.length}${TEXTS.admin.panel.messages.info.pendingActivateSuffix}`
+    );
   };
 
   const deactivateSelected = () => {
@@ -354,7 +449,9 @@ export function AdminPanel() {
     setCampaigns(updatedCampaigns);
     saveCampaigns(updatedCampaigns);
     setSelectedCampaigns(new Set());
-    toast.info(`Desactivación de ${idsToDeactivate.length} campañas pendiente de integración con backend`);
+    toast.info(
+      `${TEXTS.admin.panel.messages.info.pendingDeactivatePrefix}${idsToDeactivate.length}${TEXTS.admin.panel.messages.info.pendingDeactivateSuffix}`
+    );
   };
 
   const toggleCampaignSelection = (id: string) => {

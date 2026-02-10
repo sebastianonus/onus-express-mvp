@@ -343,7 +343,7 @@ export const TarifarioUltimaMilla = forwardRef<TarifarioUltimaMillaHandle, Tarif
       pdf.save(fileName);
     } catch (error) {
       console.error('Error generando PDF:', error);
-      alert('Error al generar el PDF. Por favor, intenta de nuevo.');
+      alert(TEXTS.tarifarios.common.alerts.pdfError);
     } finally {
       setGenerandoPDF(false);
     }
@@ -852,7 +852,7 @@ export const TarifarioUltimaMilla = forwardRef<TarifarioUltimaMillaHandle, Tarif
                           <button
                             onClick={eliminarLogoCliente}
                             className="text-red-500 hover:text-red-700 p-1"
-                            title="Eliminar logo"
+                            title={TEXTS.tarifarios.common.actions.deleteLogo}
                           >
                             <X className="h-4 w-4" />
                           </button>
@@ -907,7 +907,7 @@ export const TarifarioUltimaMilla = forwardRef<TarifarioUltimaMillaHandle, Tarif
                               <button
                                 onClick={() => eliminarVehiculo(v.tipo, v.jornada)}
                                 className="text-red-500 hover:text-red-700 p-1"
-                                title="Eliminar"
+                                title={TEXTS.tarifarios.common.actions.delete}
                               >
                                 <X className="h-4 w-4" />
                               </button>
@@ -970,7 +970,7 @@ export const TarifarioUltimaMilla = forwardRef<TarifarioUltimaMillaHandle, Tarif
                             <button
                               onClick={() => eliminarTramo(t.nombre)}
                               className="text-red-500 hover:text-red-700 p-1"
-                              title="Eliminar"
+                              title={TEXTS.tarifarios.common.actions.delete}
                             >
                               <X className="h-4 w-4" />
                             </button>
@@ -1040,7 +1040,7 @@ export const TarifarioUltimaMilla = forwardRef<TarifarioUltimaMillaHandle, Tarif
                               <button
                                 onClick={() => eliminarExtra(e.concepto)}
                                 className="text-red-500 hover:text-red-700 p-1"
-                                title="Eliminar"
+                                title={TEXTS.tarifarios.common.actions.delete}
                               >
                                 <X className="h-4 w-4" />
                               </button>

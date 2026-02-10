@@ -358,3 +358,9 @@ WHERE p.user_id = auth.uid();
 
 - Se corrigio valor invalido en `src/content/texts.ts` para `clients.form.labels.testCode`.
 - Se dejo el texto de prueba como cadena vacia para evitar error de compilacion.
+
+## Actualizacion 2026-02-10 - Admin Login en AdminPanel
+
+- Se movio el login admin al propio `AdminPanel` con bloque condicional `if (!isAuthenticated)`.
+- Se aplico el nuevo diseño visual solicitado para el formulario de PIN.
+- Se simplificaron rutas para usar `/admin` como acceso principal al panel.

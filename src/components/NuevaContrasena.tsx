@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { createClient } from '@supabase/supabase-js';
 import backgroundImage from 'figma:asset/4261f3db5c66ef3456a8ebcae9838917a1e10ea5.png';
 import logo from 'figma:asset/e80d7ef4ac3b9441721d6916cfc8ad34baf40db1.png';
+import { TEXTS } from '@/content/texts';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
@@ -48,12 +49,12 @@ export function NuevaContrasena() {
     setError('');
 
     if (password !== confirmPassword) {
-      setError('Las contraseñas no coinciden');
+      setError(TEXTS.couriers.newPassword.errors.noMatch);
       return;
     }
 
     if (password.length < 6) {
-      setError('La contraseña debe tener al menos 6 caracteres');
+      setError(TEXTS.couriers.newPassword.errors.minLength);
       return;
     }
 
@@ -61,23 +62,23 @@ export function NuevaContrasena() {
 
     try {
       if (!supabase) {
-        setError('Configuración de Supabase incompleta');
+        setError(TEXTS.couriers.newPassword.errors.supabaseConfigError);
         return;
       }
 
       const { error: updateError } = await supabase.auth.updateUser({ password });
 
       if (updateError) {
-        setError('Error al actualizar la contraseña. Intenta nuevamente.');
+        setError(TEXTS.couriers.newPassword.errors.updateFailed);
         return;
       }
 
-      toast.success('Contraseña actualizada correctamente');
+      toast.success(TEXTS.couriers.newPassword.toasts.updated);
       await supabase.auth.signOut();
       navigate('/mensajeros/acceso');
     } catch (err) {
       console.error('Error al actualizar contraseña:', err);
-      setError('Error al actualizar la contraseña. Intenta nuevamente.');
+      setError(TEXTS.couriers.newPassword.errors.updateFailed);
     } finally {
       setLoading(false);
     }
@@ -88,7 +89,7 @@ export function NuevaContrasena() {
       <div className="min-h-screen flex items-center justify-center bg-white">
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-[#00C9CE]" />
-          <p className="text-gray-600">Verificando...</p>
+          <p className="text-gray-600">{TEXTS.couriers.newPassword.verifying}</p>
         </div>
       </div>
     );
@@ -106,15 +107,15 @@ export function NuevaContrasena() {
       <div className="w-full md:w-1/2 bg-white flex items-center justify-center p-6 md:p-12">
         <div className="w-full max-w-md">
           <div className="flex justify-center mb-10">
-            <img src={logo} alt="ONUS Express" className="h-14" />
+            <img src={logo} alt={TEXTS.header.a11y.logoAlt} className="h-14" />
           </div>
 
           <div>
             <h1 className="text-2xl font-semibold text-[#000935] mb-2 text-center">
-              NUEVA CONTRASEÑA
+              {TEXTS.couriers.newPassword.title}
             </h1>
             <p className="text-gray-500 text-sm mb-8 text-center">
-              Ingresa tu nueva contraseña para restablecer el acceso a tu cuenta.
+              {TEXTS.couriers.newPassword.subtitle}
             </p>
 
             <form onSubmit={handleSubmit} className="space-y-5">
@@ -123,7 +124,7 @@ export function NuevaContrasena() {
                   htmlFor="password"
                   className="text-sm font-medium text-gray-700 mb-2 block"
                 >
-                  Nueva Contraseña
+                  {TEXTS.couriers.newPassword.passwordLabel}
                 </Label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -132,7 +133,7 @@ export function NuevaContrasena() {
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Mínimo 6 caracteres"
+                    placeholder={TEXTS.couriers.newPassword.passwordPlaceholder}
                     className="pl-10 h-11 border-gray-300 focus:border-[#00C9CE] focus:ring-[#00C9CE]"
                     required
                     disabled={loading}
@@ -146,7 +147,7 @@ export function NuevaContrasena() {
                   htmlFor="confirmPassword"
                   className="text-sm font-medium text-gray-700 mb-2 block"
                 >
-                  Confirmar Contraseña
+                  {TEXTS.couriers.newPassword.confirmPasswordLabel}
                 </Label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -155,7 +156,7 @@ export function NuevaContrasena() {
                     type="password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="Repite tu contraseña"
+                    placeholder={TEXTS.couriers.newPassword.confirmPasswordPlaceholder}
                     className="pl-10 h-11 border-gray-300 focus:border-[#00C9CE] focus:ring-[#00C9CE]"
                     required
                     disabled={loading}
@@ -179,10 +180,10 @@ export function NuevaContrasena() {
                 {loading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Actualizando...
+                    {TEXTS.couriers.newPassword.updatingButton}
                   </>
                 ) : (
-                  'Actualizar Contraseña'
+                  TEXTS.couriers.newPassword.updateButton
                 )}
               </Button>
             </form>
@@ -194,7 +195,7 @@ export function NuevaContrasena() {
                 className="text-sm text-gray-600 hover:text-gray-900"
                 disabled={loading}
               >
-                Volver al inicio de sesión
+                {TEXTS.couriers.newPassword.backToLogin}
               </Button>
             </div>
           </div>

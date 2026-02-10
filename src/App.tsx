@@ -1,4 +1,4 @@
-import { useEffect, type ReactElement } from 'react';
+import { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate, Link, Navigate } from 'react-router-dom';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
@@ -18,7 +18,6 @@ import { RecuperarContrasenaClientes } from './components/RecuperarContrasenaCli
 import { CorreoEnviadoClientes } from './components/CorreoEnviadoClientes';
 import { NuevaContrasenaClientes } from './components/NuevaContrasenaClientes';
 import { AdminPanel } from './components/AdminPanel';
-import { AdminLogin } from './components/AdminLogin';
 import { WhatsAppButton } from './components/WhatsAppButton';
 import { PrivacyPolicy } from './components/PrivacyPolicy';
 import { TermsConditions } from './components/TermsConditions';
@@ -28,15 +27,8 @@ import { CookieBanner } from './components/CookieBanner';
 import { Toaster } from 'sonner@2.0.3';
 import { Settings } from 'lucide-react';
 import { initTracking } from './utils/analytics';
-import { isAdminSessionActive } from './utils/adminAuth';
+import { TEXTS } from '@/content/texts';
 import './styles/globals.css';
-
-function AdminProtectedRoute({ children }: { children: ReactElement }) {
-  if (!isAdminSessionActive()) {
-    return <Navigate to="/admin" replace />;
-  }
-  return children;
-}
 
 function MainLayout() {
   const navigate = useNavigate();
@@ -75,8 +67,8 @@ function MainLayout() {
         to="/admin"
         className="fixed bottom-6 left-6 z-50 flex items-center justify-center w-12 h-12 rounded-full shadow-lg hover:scale-110 transition-all opacity-30 hover:opacity-100"
         style={{ backgroundColor: '#000935' }}
-        title="Panel de Administración"
-        aria-label="Panel de Administración"
+        title={TEXTS.admin.panel.header.title}
+        aria-label={TEXTS.admin.panel.header.title}
       >
         <Settings className="w-5 h-5" style={{ color: '#00C9CE' }} />
       </Link>
@@ -92,15 +84,8 @@ export default function App() {
   return (
     <Router>
       <Routes>
-        <Route path="/admin" element={<AdminLogin />} />
-        <Route
-          path="/admin/panel"
-          element={
-            <AdminProtectedRoute>
-              <AdminPanel />
-            </AdminProtectedRoute>
-          }
-        />
+        <Route path="/admin" element={<AdminPanel />} />
+        <Route path="/admin/panel" element={<Navigate to="/admin" replace />} />
 
         <Route path="/mensajeros/acceso" element={<MensajerosLogin />} />
         <Route path="/mensajeros/recuperar-contrasena" element={<RecuperarContrasena />} />

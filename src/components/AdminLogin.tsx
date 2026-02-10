@@ -45,23 +45,20 @@ export function AdminLogin() {
 
   return (
     <div
-      className="min-h-screen flex items-center justify-center p-5"
+      className="min-h-screen flex items-center justify-center px-4"
       style={{ backgroundColor: '#000935' }}
     >
-      <div className="w-full max-w-[420px] bg-[#F3F3F3] rounded-2xl p-8 sm:p-10 shadow-xl">
+      <div className="w-full max-w-md bg-white rounded-2xl p-8 shadow-2xl">
         <div className="flex justify-center mb-6">
           <div
             className="w-[60px] h-[60px] rounded-full flex items-center justify-center"
-            style={{ backgroundColor: '#16C2C7' }}
+            style={{ backgroundColor: '#00C9CE' }}
           >
             <Shield className="w-7 h-7" style={{ color: '#000935' }} />
           </div>
         </div>
 
-        <h1
-          className="text-center mb-6"
-          style={{ color: '#000935', fontFamily: 'REM, sans-serif', fontWeight: 500 }}
-        >
+        <h1 className="text-center mb-2" style={{ color: '#000935' }}>
           {TEXTS.admin.panel.login.title}
         </h1>
 
@@ -77,7 +74,7 @@ export function AdminLogin() {
               onChange={(e) => setPin(e.target.value)}
               placeholder={TEXTS.admin.panel.login.pinPlaceholder}
               autoComplete="current-password"
-              className="h-11 border-0 bg-[#E8E8E8] placeholder:text-gray-500 focus-visible:ring-[#16C2C7]"
+              className="mt-1 h-11 border-0 bg-[#E8E8E8] placeholder:text-gray-500 focus-visible:ring-[#00C9CE]"
               disabled={loading}
             />
             <p className="text-sm text-gray-500">{TEXTS.admin.panel.login.pinHelp}</p>
@@ -89,9 +86,9 @@ export function AdminLogin() {
             type="submit"
             disabled={loading}
             className="w-full mt-2 h-11 rounded-lg text-base"
-            style={{ backgroundColor: '#16C2C7', color: '#000935' }}
+            style={{ backgroundColor: '#00C9CE', color: '#000935' }}
           >
-            {loading ? 'Accediendo...' : TEXTS.admin.panel.login.accessButton}
+            {loading ? TEXTS.admin.panel.login.accessing : TEXTS.admin.panel.login.accessButton}
           </Button>
         </form>
 

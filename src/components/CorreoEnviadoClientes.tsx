@@ -3,6 +3,7 @@ import { Button } from './ui/button';
 import { CheckCircle2 } from 'lucide-react';
 import backgroundImage from 'figma:asset/433f006a1a8dbb744643830e0e0b3f07184d05b1.png';
 import logo from 'figma:asset/e80d7ef4ac3b9441721d6916cfc8ad34baf40db1.png';
+import { TEXTS } from '@/content/texts';
 
 /**
  * COMPONENTE: Correo Enviado (confirmación) - Área Clientes
@@ -28,7 +29,7 @@ export function CorreoEnviadoClientes() {
         <div className="w-full max-w-md text-center">
           {/* Logo */}
           <div className="flex justify-center mb-10">
-            <img src={logo} alt="ONUS Express" className="h-14" />
+            <img src={logo} alt={TEXTS.header.a11y.logoAlt} className="h-14" />
           </div>
 
           <div>
@@ -40,14 +41,13 @@ export function CorreoEnviadoClientes() {
             </div>
 
             <h1 className="text-2xl font-semibold text-[#000935] mb-4">
-              CORREO ENVIADO
+              {TEXTS.clients.emailSent.title}
             </h1>
 
             {/* Mensaje neutro */}
             <div className="bg-[#00C9CE]/5 border border-[#00C9CE]/20 rounded-lg p-4 mb-8">
               <p className="text-gray-700 text-sm leading-relaxed">
-                Si existe una cuenta asociada a este correo, recibirás instrucciones
-                para restablecer tu contraseña en unos minutos.
+                {TEXTS.clients.emailSent.message}
               </p>
             </div>
 
@@ -55,7 +55,7 @@ export function CorreoEnviadoClientes() {
               onClick={() => navigate('/clientes')}
               className="w-full h-11 bg-[#00C9CE] hover:bg-[#00B5BA] text-white font-medium"
             >
-              Volver al inicio de sesión
+              {TEXTS.clients.emailSent.backToLogin}
             </Button>
           </div>
         </div>

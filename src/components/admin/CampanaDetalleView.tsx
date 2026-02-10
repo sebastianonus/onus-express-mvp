@@ -72,7 +72,7 @@ export function CampanaDetalleView({ campaignId, onBack }: CampanaDetalleViewPro
      * - PATCH /api/postulaciones/:id { estado: nuevoEstado }
      */
     
-    toast.info('Función de actualización pendiente de integración con backend');
+    toast.info(TEXTS.admin.campanaDetalle.toasts.updatePendingIntegration);
   };
 
   const handleWhatsApp = (postulacion: Postulacion) => {
@@ -153,7 +153,7 @@ export function CampanaDetalleView({ campaignId, onBack }: CampanaDetalleViewPro
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
 
-      toast.info('Exportación CSV: pendiente de integración con datos reales');
+      toast.info(TEXTS.admin.campanaDetalle.toasts.exportPendingIntegration);
     } catch (error) {
       console.error('Error exportando CSV:', error);
       toast.error(TEXTS.admin.campanaDetalle.toasts.exportError);

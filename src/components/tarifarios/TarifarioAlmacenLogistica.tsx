@@ -513,7 +513,7 @@ export const TarifarioAlmacenLogistica = forwardRef<TarifarioAlmacenLogisticaHan
       pdf.save(fileName);
     } catch (error) {
       console.error('Error generando PDF:', error);
-      alert('Error al generar el PDF. Por favor, intenta de nuevo.');
+      alert(TEXTS.tarifarios.common.alerts.pdfError);
     } finally {
       setGenerandoPDF(false);
     }
@@ -1071,7 +1071,7 @@ export const TarifarioAlmacenLogistica = forwardRef<TarifarioAlmacenLogisticaHan
                               <button
                                 onClick={eliminarLogoCliente}
                                 className="text-red-500 hover:text-red-700 p-1"
-                                title="Eliminar logo"
+                                title={TEXTS.tarifarios.common.actions.deleteLogo}
                               >
                                 <X className="h-4 w-4" />
                               </button>

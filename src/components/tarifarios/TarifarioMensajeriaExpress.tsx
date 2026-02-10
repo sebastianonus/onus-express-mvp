@@ -170,7 +170,7 @@ export const TarifarioMensajeriaExpress = forwardRef<TarifarioMensajeriaExpressH
       (servicio: string, peso: number) => {
         const precio = calcularPrecioEnvio(servicio, peso);
         if (precio === 0 && servicio === 'HOY') {
-          alert('Para el servicio HOY, por favor contacte con nuestro equipo comercial.');
+          alert(TEXTS.tarifarios.common.alerts.hoyContact);
           return;
         }
         setState((prev) => ({
@@ -365,7 +365,7 @@ export const TarifarioMensajeriaExpress = forwardRef<TarifarioMensajeriaExpressH
         pdf.save(fileName);
       } catch (error) {
         console.error('Error generando PDF:', error);
-        alert('Error al generar el PDF. Por favor, intenta de nuevo.');
+        alert(TEXTS.tarifarios.common.alerts.pdfError);
       } finally {
         setGenerandoPDF(false);
       }
@@ -376,7 +376,7 @@ export const TarifarioMensajeriaExpress = forwardRef<TarifarioMensajeriaExpressH
       if (!file) return;
 
       if (file.size > 5 * 1024 * 1024) {
-        alert('El archivo es demasiado grande. Tamaño máximo: 5MB');
+        alert(TEXTS.tarifarios.common.alerts.logoTooLarge);
         e.target.value = '';
         return;
       }
@@ -386,7 +386,7 @@ export const TarifarioMensajeriaExpress = forwardRef<TarifarioMensajeriaExpressH
         setState((prev) => ({ ...prev, logoCliente: reader.result as string }));
       };
       reader.onerror = () => {
-        alert('Error al cargar el logo. Intenta con otro archivo.');
+        alert(TEXTS.tarifarios.common.alerts.logoLoadError);
         e.target.value = '';
       };
       reader.readAsDataURL(file);
@@ -852,7 +852,7 @@ export const TarifarioMensajeriaExpress = forwardRef<TarifarioMensajeriaExpressH
                               <img src={state.logoCliente} alt="Logo del cliente" className="h-12 w-auto max-w-[100px] object-contain" />
                               <span className="text-sm text-gray-600">Logo cargado</span>
                             </div>
-                            <button onClick={eliminarLogoCliente} className="text-red-500 hover:text-red-700 p-1" title="Eliminar logo">
+                            <button onClick={eliminarLogoCliente} className="text-red-500 hover:text-red-700 p-1" title={TEXTS.tarifarios.common.actions.deleteLogo}>
                               <X className="h-4 w-4" />
                             </button>
                           </div>
@@ -900,7 +900,7 @@ export const TarifarioMensajeriaExpress = forwardRef<TarifarioMensajeriaExpressH
                                   </div>
                                 </div>
 
-                                <button onClick={() => eliminarServicio(idx)} className="text-red-500 hover:text-red-700 p-1" title="Eliminar">
+                                <button onClick={() => eliminarServicio(idx)} className="text-red-500 hover:text-red-700 p-1" title={TEXTS.tarifarios.common.actions.delete}>
                                   <X className="h-4 w-4" />
                                 </button>
                               </div>
@@ -960,7 +960,7 @@ export const TarifarioMensajeriaExpress = forwardRef<TarifarioMensajeriaExpressH
                                 <div className="flex-1">
                                   <div className="text-sm font-medium text-[#000935]">{s.descripcion}</div>
                                 </div>
-                                <button onClick={() => eliminarSuplementoPeso(idx)} className="text-red-500 hover:text-red-700 p-1" title="Eliminar">
+                                <button onClick={() => eliminarSuplementoPeso(idx)} className="text-red-500 hover:text-red-700 p-1" title={TEXTS.tarifarios.common.actions.delete}>
                                   <X className="h-4 w-4" />
                                 </button>
                               </div>
@@ -1020,7 +1020,7 @@ export const TarifarioMensajeriaExpress = forwardRef<TarifarioMensajeriaExpressH
                                 <div className="flex-1">
                                   <div className="text-sm font-medium text-[#000935]">{s.descripcion}</div>
                                 </div>
-                                <button onClick={() => eliminarSuplementoDimension(idx)} className="text-red-500 hover:text-red-700 p-1" title="Eliminar">
+                                <button onClick={() => eliminarSuplementoDimension(idx)} className="text-red-500 hover:text-red-700 p-1" title={TEXTS.tarifarios.common.actions.delete}>
                                   <X className="h-4 w-4" />
                                 </button>
                               </div>
@@ -1080,7 +1080,7 @@ export const TarifarioMensajeriaExpress = forwardRef<TarifarioMensajeriaExpressH
                                 <div className="flex-1">
                                   <div className="text-sm font-medium text-[#000935]">{s.concepto}</div>
                                 </div>
-                                <button onClick={() => eliminarServicioAdicional(idx)} className="text-red-500 hover:text-red-700 p-1" title="Eliminar">
+                                <button onClick={() => eliminarServicioAdicional(idx)} className="text-red-500 hover:text-red-700 p-1" title={TEXTS.tarifarios.common.actions.delete}>
                                   <X className="h-4 w-4" />
                                 </button>
                               </div>
