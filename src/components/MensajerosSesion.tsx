@@ -90,9 +90,11 @@ interface Campana {
   descripcion: string;
   ciudad: string;
   vehiculo: string;
+  vehiculos?: string[];
   horario: string;
   jornada: string;
   pago: string;
+  requisitos?: string[];
   fechaInicio: string;
   fechaFin: string;
   activa: boolean;
@@ -163,6 +165,7 @@ export function MensajerosSesion() {
       const { data: campanasData, error: campErr } = await supabase
         .from('campaigns')
         .select('*')
+        .eq('is_active', true)
         .order('created_at', { ascending: false });
 
       if (campErr) {
@@ -175,10 +178,20 @@ export function MensajerosSesion() {
           nombre: c.nombre ?? c.titulo ?? 'Campaña',
           descripcion: c.descripcion ?? 'Sin descripción',
           ciudad: c.ciudad ?? '—',
-          vehiculo: c.vehiculo ?? 'Todos',
+          vehiculo: Array.isArray(c.vehiculos) && c.vehiculos.length === 1 ? c.vehiculos[0] : (c.vehiculo ?? 'Todos'),
+          vehiculos: Array.isArray(c.vehiculos) ? c.vehiculos : [],
           horario: c.horario ?? 'Todos',
           jornada: c.jornada ?? 'Todas',
           pago: c.pago ?? c.tarifa ?? '—',
+          requisitos: Array.isArray(c.requisitos)
+            ? c.requisitos
+                .map((r: string) => String(r))
+                .map((r: string) =>
+                  r.startsWith('FLOTISTA::') || r.startsWith('MENSAJERO::')
+                    ? r.split('::').slice(1).join('::')
+                    : r
+                )
+            : [],
           fechaInicio: c.fecha_inicio ?? c.created_at ?? new Date().toISOString(),
           fechaFin: c.fecha_fin ?? c.created_at ?? new Date().toISOString(),
           activa: Boolean(c.activa ?? c.is_active ?? true),
@@ -792,10 +805,13 @@ export function MensajerosSesion() {
                   }
 
                   const payload = {
+                    user_id: user.id,
                     campaign_id: selectedCampaign.id,
-                    motivacion: formData.motivacion,
-                    experiencia: formData.experiencia,
-                    disponibilidad: formData.disponibilidad,
+                    mensaje: [
+                      `Motivación: ${formData.motivacion}`,
+                      `Experiencia: ${formData.experiencia}`,
+                      `Disponibilidad: ${formData.disponibilidad}`,
+                    ].join('\n'),
                   };
 
                   const { error } = await supabase.from('postulaciones').insert(payload);

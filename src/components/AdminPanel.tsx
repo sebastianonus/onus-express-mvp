@@ -12,7 +12,6 @@ import { Checkbox } from './ui/checkbox';
 import { Plus, Trash2, Shield, LogOut, Briefcase, Pencil, Upload, Copy, Power, PowerOff, Search, X, User } from 'lucide-react';
 import logo from 'figma:asset/e80d7ef4ac3b9441721d6916cfc8ad34baf40db1.png';
 import { toast } from 'sonner@2.0.3';
-import { projectId, publicAnonKey } from '../utils/supabase/info';
 import { TEXTS } from '@/content/texts';
 import { useRequireRole } from '../hooks/useRequireRole';
 import { supabase } from '../supabase';
@@ -53,6 +52,65 @@ interface Campaign {
   cliente?: string;
 }
 
+interface CampaignRow {
+  id: string;
+  titulo: string;
+  descripcion: string | null;
+  ciudad: string;
+  tarifa: string;
+  cliente: string | null;
+  logo_url: string | null;
+  vehiculos: string[] | null;
+  requisitos: string[] | null;
+  is_active: boolean | null;
+  created_at: string | null;
+}
+
+const FLOTISTA_PREFIX = 'FLOTISTA::';
+const MENSAJERO_PREFIX = 'MENSAJERO::';
+
+function encodeRequisitos(flotista: string[], mensajero: string[]): string[] {
+  return [
+    ...flotista.map((doc) => `${FLOTISTA_PREFIX}${doc}`),
+    ...mensajero.map((doc) => `${MENSAJERO_PREFIX}${doc}`),
+  ];
+}
+
+function decodeRequisitos(requisitos: string[] | null): { flotista: string[]; mensajero: string[] } {
+  const flotista: string[] = [];
+  const mensajero: string[] = [];
+
+  for (const requisito of requisitos ?? []) {
+    if (requisito.startsWith(FLOTISTA_PREFIX)) {
+      flotista.push(requisito.replace(FLOTISTA_PREFIX, ''));
+      continue;
+    }
+    if (requisito.startsWith(MENSAJERO_PREFIX)) {
+      mensajero.push(requisito.replace(MENSAJERO_PREFIX, ''));
+    }
+  }
+
+  return { flotista, mensajero };
+}
+
+function mapCampaignRow(row: CampaignRow): Campaign {
+  const decodedRequisitos = decodeRequisitos(row.requisitos);
+  return {
+    id: row.id,
+    titulo: row.titulo,
+    ciudad: row.ciudad,
+    tarifa: row.tarifa,
+    descripcion: row.descripcion ?? '',
+    vehiculos: row.vehiculos ?? [],
+    flotista: decodedRequisitos.flotista,
+    mensajero: decodedRequisitos.mensajero,
+    logoUrl: row.logo_url ?? undefined,
+    isActive: row.is_active ?? true,
+    createdAt: row.created_at ?? new Date().toISOString(),
+    cliente: row.cliente ?? '',
+  };
+}
+
 export function AdminPanel() {
   // Guard de rol: solo admins pueden acceder
   useRequireRole('admin');
@@ -69,6 +127,7 @@ export function AdminPanel() {
   const navigate = useNavigate();
   const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
   const [selectedCampaigns, setSelectedCampaigns] = useState<Set<string>>(new Set());
+  const [postulacionesCount, setPostulacionesCount] = useState<Record<string, number>>({});
 
   // Estados para filtros de búsqueda
   const [searchCliente, setSearchCliente] = useState('all');
@@ -91,22 +150,42 @@ export function AdminPanel() {
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string>('');
 
-  /**
-   * PLACEHOLDER: Cargar campañas desde backend
-   * 
-   * INTEGRACIÓN FUTURA:
-   * useEffect(() => {
-   *   const fetchCampaigns = async () => {
-   *     const { data } = await supabase.from('campaigns').select('*');
-   *     setCampaigns(data || []);
-   *   };
-   *   fetchCampaigns();
-   * }, []);
-   */
+  const loadCampaigns = async () => {
+    const { data, error } = await supabase
+      .from('campaigns')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error loading campaigns:', error);
+      toast.error(TEXTS.admin.panel.messages.errors.loadCampaigns);
+      return;
+    }
+
+    setCampaigns(((data as CampaignRow[] | null) ?? []).map(mapCampaignRow));
+  };
+
+  const loadPostulacionesCount = async () => {
+    const { data, error } = await supabase.from('postulaciones').select('campaign_id');
+    if (error) {
+      console.error('Error loading postulaciones count:', error);
+      return;
+    }
+
+    const counter: Record<string, number> = {};
+    for (const row of data ?? []) {
+      const campaignId = String((row as { campaign_id?: string }).campaign_id ?? '');
+      if (!campaignId) continue;
+      counter[campaignId] = (counter[campaignId] ?? 0) + 1;
+    }
+    setPostulacionesCount(counter);
+  };
+
   useEffect(() => {
-    // Placeholder: No hay campañas hasta que se conecte el backend
-    setCampaigns([]);
-  }, []);
+    if (!isAuthenticated) return;
+    void loadCampaigns();
+    void loadPostulacionesCount();
+  }, [isAuthenticated]);
 
   // Aplicar filtros cuando cambien las campañas o los filtros
   useEffect(() => {
@@ -239,20 +318,22 @@ export function AdminPanel() {
     );
   }
 
-  const deleteAllCampaigns = () => {
+  const deleteAllCampaigns = async () => {
     if (!confirm(TEXTS.admin.panel.messages.confirms.deleteAll)) {
       return;
     }
-    
-    /**
-     * PLACEHOLDER: DELETE ALL campaigns
-     * 
-     * INTEGRACIÓN FUTURA:
-     * await supabase.from('campaigns').delete().neq('id', '00000000');
-     */
-    setCampaigns([]);
+
+    const { error } = await supabase.from('campaigns').delete().not('id', 'is', null);
+    if (error) {
+      console.error('Error deleting campaigns:', error);
+      toast.error(TEXTS.admin.panel.messages.errors.deleteAllCampaigns);
+      return;
+    }
+
     setSelectedCampaigns(new Set());
-    toast.info(TEXTS.admin.panel.messages.info.pendingBackendGeneric);
+    setPostulacionesCount({});
+    await loadCampaigns();
+    toast.success(TEXTS.admin.panel.messages.success.allDeleted);
   };
 
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -267,7 +348,7 @@ export function AdminPanel() {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!formData.titulo || !formData.ciudad || !formData.tarifa) {
@@ -283,37 +364,44 @@ export function AdminPanel() {
     setLoading(true);
 
     try {
-      const campaignId = editingCampaign?.id || crypto.randomUUID();
-      
-      const campaignData: Campaign = {
-        id: campaignId,
-        titulo: formData.titulo,
+      const payload = {
+        titulo: formData.titulo.trim(),
         ciudad: formData.ciudad,
-        tarifa: formData.tarifa,
-        descripcion: formData.descripcion,
+        tarifa: formData.tarifa.trim(),
+        descripcion: formData.descripcion.trim() || null,
         vehiculos: formData.vehiculos,
-        flotista: formData.flotista,
-        mensajero: formData.mensajero,
-        logoUrl: logoPreview || undefined,
-        isActive: editingCampaign?.isActive !== undefined ? editingCampaign.isActive : true,
-        createdAt: editingCampaign?.createdAt || new Date().toISOString(),
-        cliente: formData.cliente,
+        requisitos: encodeRequisitos(formData.flotista, formData.mensajero),
+        cliente: formData.cliente.trim() || null,
+        logo_url: logoPreview || null,
       };
 
-      let updatedCampaigns: Campaign[];
-      
       if (editingCampaign) {
-        // Actualizar campaña existente
-        updatedCampaigns = campaigns.map(c => c.id === campaignId ? campaignData : c);
-        toast.info(TEXTS.admin.panel.messages.info.pendingUpdateCampaign);
+        const { error } = await supabase
+          .from('campaigns')
+          .update(payload)
+          .eq('id', editingCampaign.id);
+
+        if (error) {
+          console.error('Error updating campaign:', error);
+          toast.error(TEXTS.admin.panel.messages.errors.saveCampaign);
+          return;
+        }
+        toast.success(TEXTS.admin.panel.messages.success.campaignUpdated);
       } else {
-        // Crear nueva campaña
-        updatedCampaigns = [...campaigns, campaignData];
-        toast.info(TEXTS.admin.panel.messages.info.pendingCreateCampaign);
+        const { error } = await supabase.from('campaigns').insert({
+          ...payload,
+          is_active: true,
+        });
+
+        if (error) {
+          console.error('Error creating campaign:', error);
+          toast.error(TEXTS.admin.panel.messages.errors.saveCampaign);
+          return;
+        }
+        toast.success(TEXTS.admin.panel.messages.success.campaignCreated);
       }
 
-      setCampaigns(updatedCampaigns);
-      saveCampaigns(updatedCampaigns);
+      await loadCampaigns();
       setShowModal(false);
       resetForm();
     } catch (error) {
@@ -324,13 +412,18 @@ export function AdminPanel() {
     }
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (!confirm(TEXTS.admin.panel.messages.confirms.deleteOne)) return;
 
-    const updatedCampaigns = campaigns.filter(c => c.id !== id);
-    setCampaigns(updatedCampaigns);
-    saveCampaigns(updatedCampaigns);
-    toast.info(TEXTS.admin.panel.messages.info.pendingDeleteCampaign);
+    const { error } = await supabase.from('campaigns').delete().eq('id', id);
+    if (error) {
+      console.error('Error deleting campaign:', error);
+      toast.error(TEXTS.admin.panel.messages.errors.deleteCampaign);
+      return;
+    }
+
+    await loadCampaigns();
+    toast.success(TEXTS.admin.panel.messages.success.campaignDeleted);
   };
 
   const handleEdit = (campaign: Campaign) => {
@@ -350,26 +443,27 @@ export function AdminPanel() {
     setShowModal(true);
   };
 
-  const handleDuplicate = (campaign: Campaign) => {
-    const duplicateCampaign: Campaign = {
-      id: crypto.randomUUID(), // Nueva ID única
+  const handleDuplicate = async (campaign: Campaign) => {
+    const { error } = await supabase.from('campaigns').insert({
       titulo: `${campaign.titulo} (copia)`,
       ciudad: campaign.ciudad,
       tarifa: campaign.tarifa,
-      descripcion: campaign.descripcion || '',
-      vehiculos: [...campaign.vehiculos], // Copia profunda del array
-      flotista: [...campaign.flotista], // Copia profunda del array
-      mensajero: [...campaign.mensajero], // Copia profunda del array
-      logoUrl: campaign.logoUrl,
-      isActive: false, // Las copias se crean inactivas
-      createdAt: new Date().toISOString(), // Nueva fecha
-      cliente: campaign.cliente || '', // Normalizar a string vacío
-    };
+      descripcion: campaign.descripcion || null,
+      vehiculos: campaign.vehiculos,
+      requisitos: encodeRequisitos(campaign.flotista, campaign.mensajero),
+      logo_url: campaign.logoUrl || null,
+      cliente: campaign.cliente || null,
+      is_active: false,
+    });
 
-    const updatedCampaigns = [...campaigns, duplicateCampaign];
-    setCampaigns(updatedCampaigns);
-    saveCampaigns(updatedCampaigns);
-    toast.info(TEXTS.admin.panel.messages.info.pendingDuplicateCampaign);
+    if (error) {
+      console.error('Error duplicating campaign:', error);
+      toast.error(TEXTS.admin.panel.messages.errors.saveCampaign);
+      return;
+    }
+
+    await loadCampaigns();
+    toast.success(TEXTS.admin.panel.messages.success.campaignDuplicated);
   };
 
   const resetForm = () => {
@@ -406,15 +500,22 @@ export function AdminPanel() {
     }));
   };
 
-  const toggleCampaignActive = (id: string, currentState: boolean) => {
-    const updatedCampaigns = campaigns.map(c => 
-      c.id === id ? { ...c, isActive: !currentState } : c
-    );
-    setCampaigns(updatedCampaigns);
-    saveCampaigns(updatedCampaigns);
+  const toggleCampaignActive = async (id: string, currentState: boolean) => {
+    const { error } = await supabase
+      .from('campaigns')
+      .update({ is_active: !currentState })
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error toggling campaign:', error);
+      toast.error(TEXTS.admin.panel.messages.errors.toggleCampaignStatus);
+      return;
+    }
+
+    await loadCampaigns();
   };
 
-  const activateSelected = () => {
+  const activateSelected = async () => {
     const idsToActivate = Array.from(selectedCampaigns);
     
     if (idsToActivate.length === 0) {
@@ -422,19 +523,25 @@ export function AdminPanel() {
       return;
     }
 
-    const updatedCampaigns = campaigns.map(c => 
-      idsToActivate.includes(c.id) ? { ...c, isActive: true } : c
-    );
-    
-    setCampaigns(updatedCampaigns);
-    saveCampaigns(updatedCampaigns);
+    const { error } = await supabase
+      .from('campaigns')
+      .update({ is_active: true })
+      .in('id', idsToActivate);
+
+    if (error) {
+      console.error('Error activating campaigns:', error);
+      toast.error(TEXTS.admin.panel.messages.errors.bulkUpdateCampaigns);
+      return;
+    }
+
+    await loadCampaigns();
     setSelectedCampaigns(new Set());
-    toast.info(
-      `${TEXTS.admin.panel.messages.info.pendingActivatePrefix}${idsToActivate.length}${TEXTS.admin.panel.messages.info.pendingActivateSuffix}`
+    toast.success(
+      `${TEXTS.admin.panel.messages.success.bulkActivatedPrefix}${idsToActivate.length}${TEXTS.admin.panel.messages.success.bulkActivatedSuffix}`
     );
   };
 
-  const deactivateSelected = () => {
+  const deactivateSelected = async () => {
     const idsToDeactivate = Array.from(selectedCampaigns);
     
     if (idsToDeactivate.length === 0) {
@@ -442,15 +549,21 @@ export function AdminPanel() {
       return;
     }
 
-    const updatedCampaigns = campaigns.map(c => 
-      idsToDeactivate.includes(c.id) ? { ...c, isActive: false } : c
-    );
-    
-    setCampaigns(updatedCampaigns);
-    saveCampaigns(updatedCampaigns);
+    const { error } = await supabase
+      .from('campaigns')
+      .update({ is_active: false })
+      .in('id', idsToDeactivate);
+
+    if (error) {
+      console.error('Error deactivating campaigns:', error);
+      toast.error(TEXTS.admin.panel.messages.errors.bulkUpdateCampaigns);
+      return;
+    }
+
+    await loadCampaigns();
     setSelectedCampaigns(new Set());
-    toast.info(
-      `${TEXTS.admin.panel.messages.info.pendingDeactivatePrefix}${idsToDeactivate.length}${TEXTS.admin.panel.messages.info.pendingDeactivateSuffix}`
+    toast.success(
+      `${TEXTS.admin.panel.messages.success.bulkDeactivatedPrefix}${idsToDeactivate.length}${TEXTS.admin.panel.messages.success.bulkDeactivatedSuffix}`
     );
   };
 
@@ -474,16 +587,7 @@ export function AdminPanel() {
     }
   };
 
-  // Función para contar postulaciones de una campaña
-  const getPostulacionesCount = (campaignId: string): number => {
-    /**
-     * PLACEHOLDER: Conteo de postulaciones
-     * 
-     * INTEGRACIÓN FUTURA:
-     * - GET /api/postulaciones?campaign_id=:id&count=true
-     */
-    return 0;
-  };
+  const getPostulacionesCount = (campaignId: string): number => postulacionesCount[campaignId] ?? 0;
 
   // Handler para ver postulaciones de una campaña
   const handleViewPostulaciones = (campaignId: string) => {

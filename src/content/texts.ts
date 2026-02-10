@@ -1482,6 +1482,11 @@ export const TEXTS = {
 
       messages: {
         errors: {
+          loadCampaigns: "Error al cargar campañas",
+          deleteCampaign: "Error al eliminar la campaña",
+          deleteAllCampaigns: "Error al eliminar todas las campañas",
+          toggleCampaignStatus: "Error al actualizar el estado de la campaña",
+          bulkUpdateCampaigns: "Error al actualizar campañas seleccionadas",
           loadContacts: "Error al cargar contactos",
           loadRequests: "Error al cargar solicitudes",
           loadCouriers: "Error al cargar mensajeros",
