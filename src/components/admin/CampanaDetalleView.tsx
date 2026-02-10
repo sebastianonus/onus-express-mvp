@@ -4,16 +4,17 @@ import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { toast } from 'sonner';
 import { TEXTS } from '@/content/texts';
+import { supabase } from '../../supabase';
 
 interface Postulacion {
   id: string;
   user_id: string; // Cambiado de mensajeroCodigo - referencia a auth.users
   campaign_id: string; // Cambiado de campanaId
-  mensajeroNombre: string; // Temporal - en producción vendrá de JOIN con auth.users
-  mensajeroEmail: string; // Temporal - en producción vendrá de JOIN con auth.users
-  mensajeroTelefono: string; // Temporal - en producción vendrá de JOIN con auth.users
+  mensajeroNombre: string; // Temporal - en producciÃ³n vendrÃ¡ de JOIN con auth.users
+  mensajeroEmail: string; // Temporal - en producciÃ³n vendrÃ¡ de JOIN con auth.users
+  mensajeroTelefono: string; // Temporal - en producciÃ³n vendrÃ¡ de JOIN con auth.users
   fecha: string;
-  estado: 'En revisión' | 'Aceptado' | 'Rechazado';
+  estado: 'En revisiÃ³n' | 'Aceptado' | 'Rechazado';
   motivacion?: string;
   experiencia?: string;
   disponibilidad?: string;
@@ -42,40 +43,163 @@ interface CampanaDetalleViewProps {
 export function CampanaDetalleView({ campaignId, onBack }: CampanaDetalleViewProps) {
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [postulaciones, setPostulaciones] = useState<Postulacion[]>([]);
-  const [filter, setFilter] = useState<'all' | 'En revisión' | 'Aceptado' | 'Rechazado'>('all');
+  const [filter, setFilter] = useState<'all' | 'En revisiÃ³n' | 'Aceptado' | 'Rechazado'>('all');
+  const [loading, setLoading] = useState(true);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
+
+  const dbEstadoToUi = (estado: string | null | undefined): Postulacion['estado'] => {
+    if (!estado) return 'En revisión';
+    const normalized = estado.toLowerCase();
+    if (normalized === 'accepted' || normalized === 'aceptado') return 'Aceptado';
+    if (normalized === 'rejected' || normalized === 'rechazado') return 'Rechazado';
+    return 'En revisión';
+  };
+
+  const uiEstadoToDb = (estado: Postulacion['estado']): 'pending' | 'accepted' | 'rejected' => {
+    if (estado === 'Aceptado') return 'accepted';
+    if (estado === 'Rechazado') return 'rejected';
+    return 'pending';
+  };
+
+  const parseMensaje = (mensaje: string | null | undefined) => {
+    const raw = typeof mensaje === 'string' ? mensaje : '';
+    const lines = raw.split('\n').map((line) => line.trim());
+    const extract = (prefix: string) =>
+      lines
+        .find((line) => line.toLowerCase().startsWith(prefix))
+        ?.split(':')
+        .slice(1)
+        .join(':')
+        .trim();
+
+    return {
+      motivacion: extract('motivaci'),
+      experiencia: extract('experiencia'),
+      disponibilidad: extract('disponibilidad'),
+    };
+  };
 
   useEffect(() => {
     loadData();
   }, [campaignId]);
 
-  const loadData = () => {
-    /**
-     * PLACEHOLDER: Cargar campaña y postulaciones
-     * 
-     * INTEGRACIÓN FUTURA:
-     * - GET /api/campaigns/:id
-     * - GET /api/postulaciones?campaign_id=:id
-     */
-    
-    // Placeholder: No hay datos hasta que se conecte backend
-    setCampaign(null);
-    setPostulaciones([]);
-    
-    console.info('CampanaDetalleView: Pendiente de integración con backend');
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const { data: campaignRow, error: campaignErr } = await supabase
+        .from('campaigns')
+        .select('*')
+        .eq('id', campaignId)
+        .maybeSingle();
+
+      if (campaignErr || !campaignRow) {
+        console.error('Error loading campaign detail:', campaignErr);
+        toast.error(TEXTS.admin.panel.messages.errors.loadCampaigns);
+        setCampaign(null);
+        setPostulaciones([]);
+        return;
+      }
+
+      const requisitos = Array.isArray((campaignRow as any).requisitos)
+        ? ((campaignRow as any).requisitos as string[])
+        : Array.isArray((campaignRow as any).requirements)
+          ? ((campaignRow as any).requirements as string[])
+          : [];
+
+      const flotista = requisitos
+        .filter((item) => item.startsWith('FLOTISTA::'))
+        .map((item) => item.replace('FLOTISTA::', ''));
+      const mensajero = requisitos
+        .filter((item) => item.startsWith('MENSAJERO::'))
+        .map((item) => item.replace('MENSAJERO::', ''));
+
+      setCampaign({
+        id: String((campaignRow as any).id),
+        titulo: String((campaignRow as any).titulo ?? (campaignRow as any).title ?? (campaignRow as any).nombre ?? ''),
+        logoUrl: (campaignRow as any).logo_url ?? (campaignRow as any).logo ?? undefined,
+        ciudad: String((campaignRow as any).ciudad ?? (campaignRow as any).city ?? ''),
+        tarifa: String((campaignRow as any).tarifa ?? (campaignRow as any).rate ?? ''),
+        descripcion: String((campaignRow as any).descripcion ?? (campaignRow as any).description ?? ''),
+        createdAt: String((campaignRow as any).created_at ?? new Date().toISOString()),
+        vehiculos: Array.isArray((campaignRow as any).vehiculos)
+          ? ((campaignRow as any).vehiculos as string[])
+          : Array.isArray((campaignRow as any).vehicles)
+            ? ((campaignRow as any).vehicles as string[])
+            : [],
+        flotista,
+        mensajero,
+        isActive: Boolean((campaignRow as any).is_active ?? (campaignRow as any).active ?? true),
+        cliente: String((campaignRow as any).cliente ?? (campaignRow as any).client ?? ''),
+      });
+
+      const { data: postsRows, error: postsErr } = await supabase
+        .from('postulaciones')
+        .select('id, user_id, campaign_id, created_at, estado, mensaje')
+        .eq('campaign_id', campaignId)
+        .order('created_at', { ascending: false });
+
+      if (postsErr) {
+        console.error('Error loading postulaciones detail:', postsErr);
+        setPostulaciones([]);
+        return;
+      }
+
+      const mapped: Postulacion[] = (postsRows ?? []).map((row: any) => {
+        const parsed = parseMensaje(row.mensaje);
+        const userId = String(row.user_id ?? '');
+        return {
+          id: String(row.id),
+          user_id: userId,
+          campaign_id: String(row.campaign_id ?? campaignId),
+          mensajeroNombre: userId || 'Mensajero',
+          mensajeroEmail: '',
+          mensajeroTelefono: '',
+          fecha: String(row.created_at ?? new Date().toISOString()),
+          estado: dbEstadoToUi(row.estado),
+          motivacion: parsed.motivacion,
+          experiencia: parsed.experiencia,
+          disponibilidad: parsed.disponibilidad,
+        };
+      });
+
+      setPostulaciones(mapped);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleUpdateEstado = (postulacionId: string, nuevoEstado: 'Aceptado' | 'Rechazado') => {
-    /**
-     * PLACEHOLDER: Actualizar estado de postulación
-     * 
-     * INTEGRACIÓN FUTURA:
-     * - PATCH /api/postulaciones/:id { estado: nuevoEstado }
-     */
-    
-    toast.info(TEXTS.admin.campanaDetalle.toasts.updatePendingIntegration);
+  const handleUpdateEstado = async (
+    postulacionId: string,
+    nuevoEstado: Postulacion['estado']
+  ) => {
+    setUpdatingId(postulacionId);
+    const dbStatus = uiEstadoToDb(nuevoEstado);
+
+    const { error } = await supabase
+      .from('postulaciones')
+      .update({ estado: dbStatus })
+      .eq('id', postulacionId);
+
+    if (error) {
+      console.error('Error updating postulacion estado:', error);
+      toast.error(TEXTS.admin.campanaDetalle.toasts.updateError);
+      setUpdatingId(null);
+      return;
+    }
+
+    setPostulaciones((prev) =>
+      prev.map((p) => (p.id === postulacionId ? { ...p, estado: nuevoEstado } : p))
+    );
+    toast.success(TEXTS.admin.campanaDetalle.toasts.updateSuccess);
+    setUpdatingId(null);
   };
 
   const handleWhatsApp = (postulacion: Postulacion) => {
+    if (!postulacion.mensajeroTelefono) {
+      toast.error('No hay teléfono disponible para este mensajero');
+      return;
+    }
+
     const firstName = postulacion.mensajeroNombre.split(' ')[0];
     const greeting = TEXTS.admin.campanaDetalle.whatsapp.greeting.replace('{firstName}', firstName);
     
@@ -134,7 +258,7 @@ export function CampanaDetalleView({ campaignId, onBack }: CampanaDetalleViewPro
       const csvDataLines = rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(';'));
       const csvContent = [csvHeaderLine, ...csvDataLines].join('\n');
 
-      // Añadir BOM para que Excel reconozca UTF-8
+      // AÃ±adir BOM para que Excel reconozca UTF-8
       const BOM = '\uFEFF';
       const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
       
@@ -143,7 +267,7 @@ export function CampanaDetalleView({ campaignId, onBack }: CampanaDetalleViewPro
       const link = document.createElement('a');
       link.href = url;
       
-      // Nombre de archivo con fecha y nombre de campaña
+      // Nombre de archivo con fecha y nombre de campaÃ±a
       const fecha = new Date().toISOString().split('T')[0];
       const campanaNombre = campaign?.titulo.replace(/[^a-zA-Z0-9]/g, '_') || 'Campana';
       link.download = `ONUS_Postulaciones_${campanaNombre}_${fecha}.csv`;
@@ -192,15 +316,23 @@ export function CampanaDetalleView({ campaignId, onBack }: CampanaDetalleViewPro
 
   const stats = {
     total: postulaciones.length,
-    enRevision: postulaciones.filter(p => p.estado === 'En revisión').length,
+    enRevision: postulaciones.filter(p => p.estado === 'En revisiÃ³n').length,
     aceptados: postulaciones.filter(p => p.estado === 'Aceptado').length,
     rechazados: postulaciones.filter(p => p.estado === 'Rechazado').length
   };
 
-  if (!campaign) {
+  if (loading) {
     return (
       <div className="text-center py-12">
         <p className="text-gray-500">{TEXTS.admin.campanaDetalle.loading}</p>
+      </div>
+    );
+  }
+
+  if (!campaign) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-gray-500">{TEXTS.admin.campanaDetalle.empty.noApplications}</p>
       </div>
     );
   }
@@ -234,14 +366,14 @@ export function CampanaDetalleView({ campaignId, onBack }: CampanaDetalleViewPro
               </h1>
               <div className="flex flex-wrap gap-2 mb-3">
                 <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-300">
-                  📍 {campaign.ciudad}
+                  ðŸ“ {campaign.ciudad}
                 </Badge>
                 <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300">
-                  💰 {campaign.tarifa}
+                  ðŸ’° {campaign.tarifa}
                 </Badge>
                 {campaign.cliente && (
                   <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-300">
-                    🏢 {campaign.cliente}
+                    ðŸ¢ {campaign.cliente}
                   </Badge>
                 )}
               </div>
@@ -253,7 +385,7 @@ export function CampanaDetalleView({ campaignId, onBack }: CampanaDetalleViewPro
         </div>
       </div>
 
-      {/* Estadísticas */}
+      {/* EstadÃ­sticas */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white rounded-xl p-6 border-2 border-gray-200 text-center">
           <p className="text-3xl mb-2" style={{ color: '#000935', fontWeight: 600 }}>
@@ -298,10 +430,10 @@ export function CampanaDetalleView({ campaignId, onBack }: CampanaDetalleViewPro
                 {TEXTS.admin.campanaDetalle.filters.all} ({stats.total})
               </Button>
               <Button
-                onClick={() => setFilter('En revisión')}
+                onClick={() => setFilter('En revisiÃ³n')}
                 size="sm"
-                variant={filter === 'En revisión' ? 'default' : 'outline'}
-                className={filter === 'En revisión' 
+                variant={filter === 'En revisiÃ³n' ? 'default' : 'outline'}
+                className={filter === 'En revisiÃ³n' 
                   ? 'bg-yellow-500 text-white hover:bg-yellow-600' 
                   : 'text-gray-700 border-gray-300'}
               >
@@ -380,7 +512,7 @@ export function CampanaDetalleView({ campaignId, onBack }: CampanaDetalleViewPro
                 {getEstadoBadge(postulacion.estado)}
               </div>
 
-              {/* Información de contacto */}
+              {/* InformaciÃ³n de contacto */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 p-4 bg-gray-50 rounded-lg">
                 <div className="flex items-center gap-2 text-sm">
                   <Phone className="w-4 h-4" style={{ color: '#00C9CE' }} />
@@ -402,7 +534,7 @@ export function CampanaDetalleView({ campaignId, onBack }: CampanaDetalleViewPro
                 </div>
               </div>
 
-              {/* Detalles de la postulación */}
+              {/* Detalles de la postulaciÃ³n */}
               <div className="space-y-3 mb-4">
                 {postulacion.motivacion && (
                   <div>
@@ -437,29 +569,54 @@ export function CampanaDetalleView({ campaignId, onBack }: CampanaDetalleViewPro
               </div>
 
               {/* Acciones */}
-              <div className="flex gap-3 pt-4 border-t border-gray-200">
-                {postulacion.estado === 'En revisión' && (
-                  <>
-                    <Button
-                      onClick={() => handleUpdateEstado(postulacion.id, 'Aceptado')}
-                      className="flex-1 bg-green-500 hover:bg-green-600 text-white"
-                    >
-                      <CheckCircle2 className="w-4 h-4 mr-2" />
-                      {TEXTS.admin.campanaDetalle.actions.accept}
-                    </Button>
-                    <Button
-                      onClick={() => handleUpdateEstado(postulacion.id, 'Rechazado')}
-                      className="flex-1 bg-red-500 hover:bg-red-600 text-white"
-                    >
-                      <XCircle className="w-4 h-4 mr-2" />
-                      {TEXTS.admin.campanaDetalle.actions.reject}
-                    </Button>
-                  </>
-                )}
-                {postulacion.estado !== 'En revisión' && (
+              <div className="pt-4 border-t border-gray-200 space-y-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs text-gray-600 uppercase tracking-wide">Estado:</span>
+                  <Button
+                    size="sm"
+                    variant={postulacion.estado === 'En revisiÃ³n' ? 'default' : 'outline'}
+                    disabled={updatingId === postulacion.id}
+                    onClick={() => handleUpdateEstado(postulacion.id, 'En revisiÃ³n')}
+                    className={
+                      postulacion.estado === 'En revisiÃ³n'
+                        ? 'h-8 rounded-full bg-yellow-500 text-white hover:bg-yellow-600'
+                        : 'h-8 rounded-full border-yellow-300 text-yellow-700 hover:bg-yellow-50'
+                    }
+                  >
+                    En revisiÃ³n
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={postulacion.estado === 'Aceptado' ? 'default' : 'outline'}
+                    disabled={updatingId === postulacion.id}
+                    onClick={() => handleUpdateEstado(postulacion.id, 'Aceptado')}
+                    className={
+                      postulacion.estado === 'Aceptado'
+                        ? 'h-8 rounded-full bg-green-500 text-white hover:bg-green-600'
+                        : 'h-8 rounded-full border-green-300 text-green-700 hover:bg-green-50'
+                    }
+                  >
+                    Aceptado
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={postulacion.estado === 'Rechazado' ? 'default' : 'outline'}
+                    disabled={updatingId === postulacion.id}
+                    onClick={() => handleUpdateEstado(postulacion.id, 'Rechazado')}
+                    className={
+                      postulacion.estado === 'Rechazado'
+                        ? 'h-8 rounded-full bg-red-500 text-white hover:bg-red-600'
+                        : 'h-8 rounded-full border-red-300 text-red-700 hover:bg-red-50'
+                    }
+                  >
+                    Rechazado
+                  </Button>
+                </div>
+
+                {(postulacion.estado === 'Aceptado' || postulacion.estado === 'Rechazado') && (
                   <Button
                     onClick={() => handleWhatsApp(postulacion)}
-                    className="flex-1"
+                    className="w-full md:w-auto"
                     style={{ backgroundColor: '#00C9CE', color: '#000935' }}
                   >
                     <MessageSquare className="w-4 h-4 mr-2" />
@@ -474,3 +631,5 @@ export function CampanaDetalleView({ campaignId, onBack }: CampanaDetalleViewPro
     </div>
   );
 }
+
+
