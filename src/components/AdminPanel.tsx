@@ -74,6 +74,17 @@ interface CampaignRow {
   created_at: string | null;
 }
 
+interface PendingProfile {
+  source: 'solicitudes_mensajeros' | 'contactos';
+  id: string;
+  nombre: string;
+  email: string;
+  telefono: string;
+  ciudad: string;
+  created_at: string | null;
+  procesado: boolean;
+}
+
 const FLOTISTA_PREFIX = 'FLOTISTA::';
 const MENSAJERO_PREFIX = 'MENSAJERO::';
 
@@ -136,6 +147,10 @@ export function AdminPanel() {
   const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
   const [selectedCampaigns, setSelectedCampaigns] = useState<Set<string>>(new Set());
   const [postulacionesCount, setPostulacionesCount] = useState<Record<string, number>>({});
+  const [adminOpsPin, setAdminOpsPin] = useState('');
+  const [pendingProfiles, setPendingProfiles] = useState<PendingProfile[]>([]);
+  const [loadingProfiles, setLoadingProfiles] = useState(false);
+  const [creatingUserKey, setCreatingUserKey] = useState<string | null>(null);
 
   // Estados para filtros de búsqueda
   const [searchCliente, setSearchCliente] = useState('all');
@@ -253,6 +268,90 @@ export function AdminPanel() {
   };
 
   const hasActiveFilters = searchCliente !== 'all' || searchCiudad !== 'all' || searchDescripcion !== '' || searchTarifa !== '';
+
+  const functionsBaseUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/server/make-server-372a0974/admin`;
+  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+
+  const fetchPendingProfiles = async () => {
+    if (!adminOpsPin.trim()) {
+      toast.error(TEXTS.admin.panel.profiles.errors.missingPinLoad);
+      return;
+    }
+    if (!anonKey) {
+      toast.error(TEXTS.admin.panel.profiles.errors.missingConfig);
+      return;
+    }
+
+    setLoadingProfiles(true);
+    try {
+      const res = await fetch(`${functionsBaseUrl}/pending-profiles`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: anonKey,
+          Authorization: `Bearer ${anonKey}`,
+        },
+        body: JSON.stringify({ pin: adminOpsPin.trim() }),
+      });
+      const json = await res.json();
+      if (!res.ok || json?.error) {
+        toast.error(json?.error ?? TEXTS.admin.panel.profiles.errors.load);
+        return;
+      }
+      setPendingProfiles((json?.profiles ?? []) as PendingProfile[]);
+    } catch (err) {
+      console.error('Error cargando perfiles pendientes:', err);
+      toast.error(TEXTS.admin.panel.profiles.errors.loadGeneric);
+    } finally {
+      setLoadingProfiles(false);
+    }
+  };
+
+  const createUserFromProfile = async (profile: PendingProfile, role: 'mensajero' | 'cliente') => {
+    if (!adminOpsPin.trim()) {
+      toast.error(TEXTS.admin.panel.profiles.errors.missingPinCreate);
+      return;
+    }
+    if (!anonKey) {
+      toast.error(TEXTS.admin.panel.profiles.errors.missingConfig);
+      return;
+    }
+
+    const rowKey = `${profile.source}:${profile.id}:${role}`;
+    setCreatingUserKey(rowKey);
+    try {
+      const res = await fetch(`${functionsBaseUrl}/create-user`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: anonKey,
+          Authorization: `Bearer ${anonKey}`,
+        },
+        body: JSON.stringify({
+          pin: adminOpsPin.trim(),
+          email: profile.email,
+          nombre: profile.nombre,
+          telefono: profile.telefono,
+          role,
+          source: profile.source,
+          sourceId: profile.id,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || json?.error) {
+        toast.error(json?.error ?? TEXTS.admin.panel.profiles.errors.create);
+        return;
+      }
+
+      toast.success(`${TEXTS.admin.panel.profiles.success.userCreatedPrefix} ${profile.email}`);
+      await fetchPendingProfiles();
+    } catch (err) {
+      console.error('Error creando usuario:', err);
+      toast.error(TEXTS.admin.panel.profiles.errors.createGeneric);
+    } finally {
+      setCreatingUserKey(null);
+    }
+  };
 
   const handleLogout = () => {
     clearAdminSession();
@@ -750,6 +849,76 @@ export function AdminPanel() {
                   {TEXTS.admin.panel.campaigns.deleteAll}
                 </Button>
               </div>
+            </div>
+
+            <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 mb-6">
+              <div className="flex flex-col md:flex-row md:items-end gap-3 md:justify-between mb-4">
+                <div>
+                  <h2 className="text-lg text-[#000935]" style={{ fontFamily: 'REM, sans-serif', fontWeight: 500 }}>
+                    {TEXTS.admin.panel.profiles.title}
+                  </h2>
+                  <p className="text-sm text-gray-500">
+                    {TEXTS.admin.panel.profiles.subtitle}
+                  </p>
+                </div>
+                <div className="flex gap-2 w-full md:w-auto">
+                  <Input
+                    type="password"
+                    value={adminOpsPin}
+                    onChange={(e) => setAdminOpsPin(e.target.value)}
+                    placeholder={TEXTS.admin.panel.profiles.pinPlaceholder}
+                    className="w-full md:w-44"
+                  />
+                  <Button
+                    onClick={fetchPendingProfiles}
+                    variant="outline"
+                    className="border-[#00C9CE] text-[#00C9CE] hover:bg-[#00C9CE]/10"
+                    disabled={loadingProfiles}
+                  >
+                    {loadingProfiles ? TEXTS.admin.panel.profiles.loading : TEXTS.admin.panel.profiles.load}
+                  </Button>
+                </div>
+              </div>
+
+              {pendingProfiles.length === 0 ? (
+                <p className="text-sm text-gray-500">{TEXTS.admin.panel.profiles.empty}</p>
+              ) : (
+                <div className="space-y-3">
+                  {pendingProfiles.map((profile) => (
+                    <div key={`${profile.source}:${profile.id}`} className="border border-gray-200 rounded-lg p-4">
+                      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                        <div className="text-sm">
+                          <p className="text-[#000935] font-medium">{profile.nombre || '-'}</p>
+                          <p className="text-gray-600">{profile.email || '-'}</p>
+                          <p className="text-gray-500">{profile.telefono || '-'}</p>
+                          <p className="text-xs text-gray-400">
+                            {profile.source} {TEXTS.admin.panel.profiles.sourceSeparator} {profile.created_at ? new Date(profile.created_at).toLocaleString('es-ES') : '-'}
+                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            className="bg-[#00C9CE] hover:bg-[#00B5BA] text-[#000935]"
+                            disabled={creatingUserKey === `${profile.source}:${profile.id}:mensajero`}
+                            onClick={() => createUserFromProfile(profile, 'mensajero')}
+                          >
+                            {TEXTS.admin.panel.profiles.actions.createCourier}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="border-[#000935] text-[#000935]"
+                            disabled={creatingUserKey === `${profile.source}:${profile.id}:cliente`}
+                            onClick={() => createUserFromProfile(profile, 'cliente')}
+                          >
+                            {TEXTS.admin.panel.profiles.actions.createClient}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {campaigns.length === 0 ? (
@@ -1276,3 +1445,5 @@ function CampaignCard({ campaign, onEdit, onDelete, onDuplicate, onToggleActive,
     </div>
   );
 }
+
+

@@ -1411,6 +1411,32 @@ export const TEXTS = {
         inactiveGroupTitlePrefix: "Campañas Inactivas",
       },
 
+      profiles: {
+        title: "Perfiles pendientes (solicitudes y contactos)",
+        subtitle: "Crea usuarios en Auth con rol desde registros de Supabase.",
+        pinPlaceholder: "PIN admin",
+        load: "Cargar",
+        loading: "Cargando...",
+        empty: "Sin datos cargados o sin perfiles pendientes.",
+        sourceSeparator: "·",
+        errors: {
+          missingPinLoad: "Ingresa el PIN para cargar perfiles",
+          missingPinCreate: "Ingresa el PIN para crear usuarios",
+          missingConfig: "Falta configuración de Supabase",
+          load: "No se pudieron cargar perfiles",
+          loadGeneric: "Error cargando perfiles pendientes",
+          create: "No se pudo crear el usuario",
+          createGeneric: "Error creando usuario",
+        },
+        success: {
+          userCreatedPrefix: "Usuario creado:",
+        },
+        actions: {
+          createCourier: "Crear mensajero",
+          createClient: "Crear cliente",
+        },
+      },
+
       filters: {
         title: "Filtrar Campañas",
         clear: "Limpiar filtros",

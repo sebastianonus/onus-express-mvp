@@ -35,6 +35,10 @@ const supabase = createClient(
   Deno.env.get("SUPABASE_URL") ?? "",
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
 );
+const adminPanelPin = Deno.env.get("ADMIN_PANEL_PIN") ?? Deno.env.get("ADMIN_PIN") ?? "";
+
+const isAdminPinValid = (pin: string | undefined) =>
+  Boolean(adminPanelPin) && Boolean(pin) && pin === adminPanelPin;
 
 app.get("/make-server-372a0974/health", (c) => {
   return c.json({ status: "ok", timestamp: new Date().toISOString() });
@@ -868,6 +872,178 @@ app.patch("/make-server-372a0974/leads/:id", async (c) => {
   } catch (error) {
     console.error("Error actualizando lead:", error);
     return c.json({ error: "Error al actualizar lead" }, 500);
+  }
+});
+
+// ========== ADMIN: PERFILES DESDE CONTACTOS/SOLICITUDES ==========
+
+app.post("/make-server-372a0974/admin/pending-profiles", async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const pin = body?.pin as string | undefined;
+
+    if (!isAdminPinValid(pin)) {
+      return c.json({ error: "PIN inválido" }, 401);
+    }
+
+    const [solicitudesRes, contactosRes] = await Promise.all([
+      supabase
+        .from("solicitudes_mensajeros")
+        .select("id,nombre,email,telefono,ciudad,created_at,procesado")
+        .order("created_at", { ascending: false })
+        .limit(200),
+      supabase
+        .from("contactos")
+        .select("id,nombre,email,telefono,created_at")
+        .order("created_at", { ascending: false })
+        .limit(200),
+    ]);
+
+    if (solicitudesRes.error) {
+      return c.json({ error: solicitudesRes.error.message }, 500);
+    }
+    if (contactosRes.error) {
+      return c.json({ error: contactosRes.error.message }, 500);
+    }
+
+    const solicitudes = (solicitudesRes.data ?? []).map((row: any) => ({
+      source: "solicitudes_mensajeros",
+      id: row.id,
+      nombre: row.nombre ?? "",
+      email: row.email ?? "",
+      telefono: row.telefono ?? "",
+      ciudad: row.ciudad ?? "",
+      created_at: row.created_at ?? null,
+      procesado: Boolean(row.procesado ?? false),
+    }));
+
+    const contactos = (contactosRes.data ?? []).map((row: any) => ({
+      source: "contactos",
+      id: row.id,
+      nombre: row.nombre ?? "",
+      email: row.email ?? "",
+      telefono: row.telefono ?? "",
+      ciudad: "",
+      created_at: row.created_at ?? null,
+      procesado: false,
+    }));
+
+    return c.json({
+      success: true,
+      profiles: [...solicitudes, ...contactos].sort(
+        (a, b) =>
+          new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime()
+      ),
+    });
+  } catch (error) {
+    console.error("Error cargando perfiles pendientes:", error);
+    return c.json({ error: "Error cargando perfiles pendientes" }, 500);
+  }
+});
+
+app.post("/make-server-372a0974/admin/create-user", async (c) => {
+  try {
+    const body = await c.req.json();
+    const pin = body?.pin as string | undefined;
+
+    if (!isAdminPinValid(pin)) {
+      return c.json({ error: "PIN inválido" }, 401);
+    }
+
+    const email = String(body?.email ?? "").trim().toLowerCase();
+    const nombre = String(body?.nombre ?? "").trim();
+    const telefono = String(body?.telefono ?? "").trim();
+    const role = String(body?.role ?? "mensajero").trim();
+    const source = String(body?.source ?? "").trim();
+    const sourceId = String(body?.sourceId ?? "").trim();
+
+    if (!email) return c.json({ error: "Email requerido" }, 400);
+    if (!["mensajero", "cliente"].includes(role)) {
+      return c.json({ error: "Rol inválido" }, 400);
+    }
+
+    const userMetadata: Record<string, string> = {
+      nombre,
+      telefono,
+    };
+    if (role === "mensajero") {
+      userMetadata.codigo = Math.floor(100000 + Math.random() * 900000).toString();
+    }
+
+    const { data, error } = await supabase.auth.admin.createUser({
+      email,
+      email_confirm: true,
+      app_metadata: { role },
+      user_metadata: userMetadata,
+    });
+
+    if (error) {
+      const msg = String(error.message ?? "").toLowerCase();
+      if (msg.includes("already") || msg.includes("registered") || msg.includes("exists")) {
+        return c.json({ error: "El usuario ya existe" }, 409);
+      }
+      return c.json({ error: error.message }, 500);
+    }
+
+    if (source === "solicitudes_mensajeros" && sourceId) {
+      await supabase
+        .from("solicitudes_mensajeros")
+        .update({ procesado: true })
+        .eq("id", sourceId);
+    }
+    if (source === "contactos" && sourceId) {
+      const { error: contactosUpdateError } = await supabase
+        .from("contactos")
+        .update({ procesado: true })
+        .eq("id", sourceId);
+
+      if (contactosUpdateError) {
+        const code = String((contactosUpdateError as { code?: string }).code ?? "");
+        // Ignore missing column/table to keep compatibility with current schemas.
+        if (code !== "42703" && code !== "42P01") {
+          console.error("Error marcando contacto como procesado:", contactosUpdateError);
+        }
+      }
+    }
+
+    // Sync in public.users when that table exists in the project.
+    // If it does not exist yet, keep the flow successful using auth.users only.
+    if (data.user?.id) {
+      const { error: usersTableError } = await supabase
+        .from("users")
+        .upsert(
+          {
+            id: data.user.id,
+            email,
+            nombre: nombre || null,
+            telefono: telefono || null,
+            role,
+            source: source || null,
+            source_id: sourceId || null,
+          },
+          { onConflict: "id" }
+        );
+
+      if (usersTableError) {
+        const code = String((usersTableError as { code?: string }).code ?? "");
+        // Ignore "relation does not exist" to stay compatible with setups without public.users.
+        if (code !== "42P01") {
+          console.error("Error sincronizando public.users:", usersTableError);
+        }
+      }
+    }
+
+    return c.json({
+      success: true,
+      user: {
+        id: data.user?.id ?? null,
+        email: data.user?.email ?? email,
+        role,
+      },
+    });
+  } catch (error) {
+    console.error("Error creando usuario auth:", error);
+    return c.json({ error: "Error creando usuario" }, 500);
   }
 });
 
