@@ -41,6 +41,7 @@ interface Postulacion {
   motivacion?: string;
   experiencia?: string;
   disponibilidad?: string;
+  mensaje?: string;
 }
 
 export function MensajerosPostulaciones() {
@@ -83,7 +84,7 @@ export function MensajerosPostulaciones() {
 
       const { data: posts, error: postsErr } = await supabase
         .from('postulaciones')
-        .select('id, user_id, campaign_id, created_at, estado, motivacion, experiencia, disponibilidad');
+        .select('id, user_id, campaign_id, created_at, estado, mensaje');
 
       if (postsErr) {
         console.error('Error cargando postulaciones:', postsErr);
@@ -99,22 +100,50 @@ export function MensajerosPostulaciones() {
       if (campaignIds.length > 0) {
         const { data: camps, error: campsErr } = await supabase
           .from('campaigns')
-          .select('id, nombre')
+          .select('id, nombre, titulo, title')
           .in('id', campaignIds);
 
         if (campsErr) {
           console.error('Error cargando campañas:', campsErr);
         } else {
           campaignNameById = new Map(
-            (camps ?? []).map((c: any) => [String(c.id), String(c.nombre ?? 'Campaña')])
+            (camps ?? []).map((c: any) => [String(c.id), String(c.nombre ?? c.titulo ?? c.title ?? 'Campaña')])
           );
         }
       }
 
       const mapped: Postulacion[] = (posts ?? []).map((p: any) => {
-        const rawEstado = String(p.estado ?? 'En revisión');
+        const rawEstado = String(p.estado ?? 'pending');
         const estado =
-          rawEstado === 'Aceptado' || rawEstado === 'Rechazado' ? rawEstado : 'En revisión';
+          rawEstado === 'Aceptado' || rawEstado === 'accepted'
+            ? 'Aceptado'
+            : rawEstado === 'Rechazado' || rawEstado === 'rejected'
+              ? 'Rechazado'
+              : 'En revisión';
+
+        const rawMensaje = typeof p.mensaje === 'string' ? p.mensaje : '';
+        const lineas = rawMensaje.split('\n').map((linea: string) => linea.trim());
+        const motivacion =
+          lineas
+            .find((l: string) => l.toLowerCase().startsWith('motivaci'))
+            ?.split(':')
+            .slice(1)
+            .join(':')
+            .trim() || undefined;
+        const experiencia =
+          lineas
+            .find((l: string) => l.toLowerCase().startsWith('experiencia'))
+            ?.split(':')
+            .slice(1)
+            .join(':')
+            .trim() || undefined;
+        const disponibilidad =
+          lineas
+            .find((l: string) => l.toLowerCase().startsWith('disponibilidad'))
+            ?.split(':')
+            .slice(1)
+            .join(':')
+            .trim() || undefined;
 
         return {
           id: String(p.id),
@@ -123,9 +152,10 @@ export function MensajerosPostulaciones() {
           campanaNombre: campaignNameById.get(String(p.campaign_id)) ?? 'Campaña',
           fecha: String(p.created_at ?? new Date().toISOString()),
           estado,
-          motivacion: p.motivacion ?? undefined,
-          experiencia: p.experiencia ?? undefined,
-          disponibilidad: p.disponibilidad ?? undefined,
+          motivacion,
+          experiencia,
+          disponibilidad,
+          mensaje: rawMensaje || undefined,
         };
       });
 
@@ -397,3 +427,5 @@ export function MensajerosPostulaciones() {
     </div>
   );
 }
+
+
