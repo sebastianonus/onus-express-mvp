@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Textarea } from './ui/textarea';
 import { Button } from './ui/button';
@@ -6,8 +6,8 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { MessageCircle, Mail, Phone, CheckCircle2 } from 'lucide-react';
 import backgroundImg from 'figma:asset/e4d65246763c398c8158c537a32f609404b085bd.png';
-import { projectId, publicAnonKey } from '../utils/supabase/info';
 import { TEXTS } from '@/content/texts';
+import { supabase } from '../supabase';
 
 export function Contacto() {
   const [searchParams] = useSearchParams();
@@ -44,20 +44,23 @@ export function Contacto() {
     setError('');
 
     try {
-      /**
-       * PLACEHOLDER: Envío de formulario de contacto
-       * 
-       * INTEGRACIÓN FUTURA:
-       * - POST a /api/leads con datos del formulario
-       * - Envío de email mediante Edge Function
-       */
-      
-      // Placeholder: Mostrar que la función no está conectada
+      const payload = {
+        nombre: formData.nombre.trim(),
+        empresa: formData.empresa.trim() || null,
+        telefono: formData.telefono.trim(),
+        email: formData.email.trim(),
+        mensaje: formData.mensaje.trim(),
+      };
+
+      const { error: insertError } = await supabase.from('contactos').insert(payload);
+
+      if (insertError) {
+        throw insertError;
+      }
+
       setSubmitted(true);
-      
-      console.info('Formulario Contacto: Pendiente de integración con backend');
     } catch (err) {
-      console.error('Error guardando lead:', err);
+      console.error('Error guardando contacto:', err);
       setError(err instanceof Error ? err.message : 'Error al enviar el formulario');
     } finally {
       setIsSubmitting(false);

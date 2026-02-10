@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import backgroundImage from 'figma:asset/433f006a1a8dbb744643830e0e0b3f07184d05b1.png';
 import logo from 'figma:asset/e80d7ef4ac3b9441721d6916cfc8ad34baf40db1.png';
 import { TEXTS } from '@/content/texts';
+import { supabase } from '../supabase';
 
 /**
  * COMPONENTE: Nueva Contraseña - Área Clientes
@@ -27,21 +28,15 @@ export function NuevaContrasenaClientes() {
   const [hasToken, setHasToken] = useState(false);
 
   useEffect(() => {
-    /**
-     * INTEGRACIÓN FUTURA:
-     * Verificar si hay token de recovery en la URL
-     * 
-     * const hashParams = new URLSearchParams(window.location.hash.substring(1));
-     * const type = hashParams.get('type');
-     * if (type === 'recovery') {
-     *   setHasToken(true);
-     * } else {
-     *   navigate('/clientes');
-     * }
-     */
-    
-    // Placeholder: permitir acceso para pruebas de UI
-    setHasToken(true);
+    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    const type = hashParams.get('type');
+
+    if (type === 'recovery') {
+      setHasToken(true);
+      return;
+    }
+
+    navigate('/clientes');
   }, [navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -63,28 +58,16 @@ export function NuevaContrasenaClientes() {
     setLoading(true);
 
     try {
-      /**
-       * INTEGRACIÓN FUTURA:
-       * await supabase.auth.updateUser({ password });
-       * 
-       * Si éxito:
-       * - Mostrar toast de éxito
-       * - Redirigir a login
-       * 
-       * NO guardar tokens
-       * NO localStorage
-       * NO lógica custom
-       */
-      
-      // Placeholder: mostrar que está pendiente de integración
-      toast.info(TEXTS.clients.newPassword.toasts.pendingIntegration);
-      
-      // En producción, redirigir a login tras éxito
-      setTimeout(() => {
-        toast.success(TEXTS.clients.newPassword.toasts.updated);
-        navigate('/clientes');
-      }, 1000);
-      
+      const { error: updateError } = await supabase.auth.updateUser({ password });
+
+      if (updateError) {
+        setError(TEXTS.clients.newPassword.errors.updateFailed);
+        return;
+      }
+
+      toast.success(TEXTS.clients.newPassword.toasts.updated);
+      await supabase.auth.signOut();
+      navigate('/clientes');
     } catch (error) {
       console.error('Error al actualizar contraseña:', error);
       setError(TEXTS.clients.newPassword.errors.updateFailed);

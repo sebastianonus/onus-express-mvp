@@ -110,13 +110,33 @@ export function MensajerosLogin() {
         nombre: formData.nombre.trim(),
         telefono: formData.telefono.trim(),
         ciudad: formData.ciudad,
+        experiencia: `Vehículo: ${formData.vehiculo}\nFlotista: ${formData.flotista}`,
+      };
+
+      const payloadLegacy = {
+        ...payload,
         vehiculo: formData.vehiculo,
         flotista: formData.flotista,
       };
 
-      const { error } = await supabase.from('solicitudes_mensajeros').insert(payload);
+      let insertError: unknown = null;
+      const first = await supabase.from('solicitudes_mensajeros').insert(payloadLegacy);
+      insertError = first.error;
+      if (insertError) {
+        const second = await supabase.from('solicitudes_mensajeros').insert(payload);
+        insertError = second.error;
+      }
+      if (insertError) {
+        const third = await supabase.from('solicitudes_mensajeros').insert({
+          nombre: payload.nombre,
+          email: payload.email,
+          telefono: payload.telefono,
+          ciudad: payload.ciudad,
+        });
+        insertError = third.error;
+      }
 
-      if (error) {
+      if (insertError) {
         toast.error(TEXTS.couriers.login.feedback.errors.registerFailed);
         return;
       }

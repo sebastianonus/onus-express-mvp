@@ -5,8 +5,8 @@ import mensajeroImg from 'figma:asset/f7f66d53263abb0cb68cc2557f63811408636e3d.p
 import flotaImg from 'figma:asset/75a4f1c6db6f262602b59fe34d37008c74077a3f.png';
 import logisticaImg from 'figma:asset/db9abd92e988b2aa58d2d633b644cd55d0b3a92d.png';
 import heroBg from 'figma:asset/0a1757e638ab1fb53c0032b34a92c151833d26de.png';
-import { projectId, publicAnonKey } from '../utils/supabase/info';
 import { TEXTS } from '@/content/texts';
+import { supabase } from '../supabase';
 
 export function Servicios() {
   const location = useLocation();
@@ -41,20 +41,54 @@ export function Servicios() {
     e.preventDefault();
     setIsSubmitting(true);
     setError('');
-    
+
     try {
-      /**
-       * PLACEHOLDER: Env√≠o de solicitud de servicio
-       * 
-       * INTEGRACI√ìN FUTURA:
-       * - POST a /api/solicitudes con datos del formulario
-       * - Env√≠o de email mediante Edge Function
-       */
-      
-      // Placeholder: Mostrar que la funci√≥n no est√° conectada
+      const basePayload = {
+        nombre: formularioData.nombre.trim(),
+        telefono: formularioData.telefono.trim(),
+        email: formularioData.email.trim(),
+        ciudad: formularioData.zona.trim(),
+      };
+
+      const experienciaDetallada = [
+        `Experiencia: ${formularioData.experiencia.trim()}`,
+        `VehÌculo: ${formularioData.tipoVehiculo.trim()}`,
+        `CaracterÌsticas del vehÌculo: ${formularioData.caracteristicasVehiculo.trim()}`,
+        `Fecha de inicio: ${formularioData.fechaInicio.trim()}`,
+        `Horario disponible: ${formularioData.horarioDisponible.trim()}`,
+        `AutÛnomo: ${formularioData.autonomo.trim()}`,
+        `Comentarios: ${formularioData.comentarios.trim()}`,
+      ]
+        .filter((linea) => !linea.endsWith(': '))
+        .join('\n');
+
+      const payloadA = {
+        ...basePayload,
+        experiencia: experienciaDetallada || null,
+        vehiculo: formularioData.tipoVehiculo.trim() || null,
+        flotista: formularioData.autonomo.trim() || null,
+      };
+      const payloadB = {
+        ...basePayload,
+        experiencia: experienciaDetallada || null,
+      };
+
+      let insertError: unknown = null;
+      const first = await supabase.from('solicitudes_mensajeros').insert(payloadA);
+      insertError = first.error;
+      if (insertError) {
+        const second = await supabase.from('solicitudes_mensajeros').insert(payloadB);
+        insertError = second.error;
+      }
+      if (insertError) {
+        const third = await supabase.from('solicitudes_mensajeros').insert(basePayload);
+        insertError = third.error;
+      }
+      if (insertError) {
+        throw insertError;
+      }
+
       setFormularioEnviado(true);
-      
-      console.info('Formulario Servicios: Pendiente de integraci√≥n con backend');
     } catch (error) {
       console.error('Error guardando solicitud:', error);
       setError(error instanceof Error ? error.message : 'Error al enviar la solicitud');
