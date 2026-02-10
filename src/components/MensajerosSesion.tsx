@@ -162,11 +162,21 @@ export function MensajerosSesion() {
       });
 
       // Cargar campañas (RLS: solo mensajero)
-      const { data: campanasData, error: campErr } = await supabase
+      let { data: campanasData, error: campErr } = await supabase
         .from('campaigns')
         .select('*')
         .eq('is_active', true)
         .order('created_at', { ascending: false });
+
+      if (campErr) {
+        const fallback = await supabase
+          .from('campaigns')
+          .select('*')
+          .eq('active', true)
+          .order('created_at', { ascending: false });
+        campanasData = fallback.data;
+        campErr = fallback.error;
+      }
 
       if (campErr) {
         console.error('Error cargando campañas:', campErr);
@@ -175,16 +185,18 @@ export function MensajerosSesion() {
       } else {
         const mapped: Campana[] = (campanasData ?? []).map((c: any) => ({
           id: c.id,
-          nombre: c.nombre ?? c.titulo ?? 'Campaña',
-          descripcion: c.descripcion ?? 'Sin descripción',
-          ciudad: c.ciudad ?? '—',
-          vehiculo: Array.isArray(c.vehiculos) && c.vehiculos.length === 1 ? c.vehiculos[0] : (c.vehiculo ?? 'Todos'),
-          vehiculos: Array.isArray(c.vehiculos) ? c.vehiculos : [],
+          nombre: c.nombre ?? c.titulo ?? c.title ?? 'Campaña',
+          descripcion: c.descripcion ?? c.description ?? 'Sin descripción',
+          ciudad: c.ciudad ?? c.city ?? '—',
+          vehiculo: Array.isArray(c.vehiculos ?? c.vehicles) && (c.vehiculos ?? c.vehicles).length === 1
+            ? (c.vehiculos ?? c.vehicles)[0]
+            : (c.vehiculo ?? 'Todos'),
+          vehiculos: Array.isArray(c.vehiculos ?? c.vehicles) ? (c.vehiculos ?? c.vehicles) : [],
           horario: c.horario ?? 'Todos',
           jornada: c.jornada ?? 'Todas',
-          pago: c.pago ?? c.tarifa ?? '—',
-          requisitos: Array.isArray(c.requisitos)
-            ? c.requisitos
+          pago: c.pago ?? c.tarifa ?? c.rate ?? '—',
+          requisitos: Array.isArray(c.requisitos ?? c.requirements)
+            ? (c.requisitos ?? c.requirements)
                 .map((r: string) => String(r))
                 .map((r: string) =>
                   r.startsWith('FLOTISTA::') || r.startsWith('MENSAJERO::')
@@ -194,7 +206,7 @@ export function MensajerosSesion() {
             : [],
           fechaInicio: c.fecha_inicio ?? c.created_at ?? new Date().toISOString(),
           fechaFin: c.fecha_fin ?? c.created_at ?? new Date().toISOString(),
-          activa: Boolean(c.activa ?? c.is_active ?? true),
+          activa: Boolean(c.activa ?? c.is_active ?? c.active ?? true),
         }));
 
         setCampanas(mapped);

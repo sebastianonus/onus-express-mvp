@@ -54,15 +54,23 @@ interface Campaign {
 
 interface CampaignRow {
   id: string;
-  titulo: string;
+  titulo: string | null;
+  title?: string | null;
   descripcion: string | null;
-  ciudad: string;
-  tarifa: string;
+  city?: string | null;
+  ciudad: string | null;
+  rate?: string | null;
+  tarifa: string | null;
   cliente: string | null;
+  client?: string | null;
   logo_url: string | null;
+  logo?: string | null;
   vehiculos: string[] | null;
+  vehicles?: string[] | null;
   requisitos: string[] | null;
+  requirements?: string[] | null;
   is_active: boolean | null;
+  active?: boolean | null;
   created_at: string | null;
 }
 
@@ -94,20 +102,20 @@ function decodeRequisitos(requisitos: string[] | null): { flotista: string[]; me
 }
 
 function mapCampaignRow(row: CampaignRow): Campaign {
-  const decodedRequisitos = decodeRequisitos(row.requisitos);
+  const decodedRequisitos = decodeRequisitos(row.requisitos ?? row.requirements ?? null);
   return {
     id: row.id,
-    titulo: row.titulo,
-    ciudad: row.ciudad,
-    tarifa: row.tarifa,
+    titulo: row.titulo ?? row.title ?? '',
+    ciudad: row.ciudad ?? row.city ?? '',
+    tarifa: row.tarifa ?? row.rate ?? '',
     descripcion: row.descripcion ?? '',
-    vehiculos: row.vehiculos ?? [],
+    vehiculos: row.vehiculos ?? row.vehicles ?? [],
     flotista: decodedRequisitos.flotista,
     mensajero: decodedRequisitos.mensajero,
-    logoUrl: row.logo_url ?? undefined,
-    isActive: row.is_active ?? true,
+    logoUrl: row.logo_url ?? row.logo ?? undefined,
+    isActive: row.is_active ?? row.active ?? true,
     createdAt: row.created_at ?? new Date().toISOString(),
-    cliente: row.cliente ?? '',
+    cliente: row.cliente ?? row.client ?? '',
   };
 }
 
@@ -150,11 +158,27 @@ export function AdminPanel() {
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string>('');
 
+  const saveWithSchemaFallback = async (
+    operationEs: () => Promise<{ error: unknown }>,
+    operationEn: () => Promise<{ error: unknown }>
+  ) => {
+    const first = await operationEs();
+    if (!(first as { error?: unknown }).error) return { error: null };
+    const second = await operationEn();
+    return second;
+  };
+
   const loadCampaigns = async () => {
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from('campaigns')
       .select('*')
       .order('created_at', { ascending: false });
+
+    if (error) {
+      const fallback = await supabase.from('campaigns').select('*');
+      data = fallback.data;
+      error = fallback.error;
+    }
 
     if (error) {
       console.error('Error loading campaigns:', error);
@@ -364,22 +388,33 @@ export function AdminPanel() {
     setLoading(true);
 
     try {
-      const payload = {
+      const requisitos = encodeRequisitos(formData.flotista, formData.mensajero);
+      const payloadEs = {
         titulo: formData.titulo.trim(),
         ciudad: formData.ciudad,
         tarifa: formData.tarifa.trim(),
         descripcion: formData.descripcion.trim() || null,
         vehiculos: formData.vehiculos,
-        requisitos: encodeRequisitos(formData.flotista, formData.mensajero),
+        requisitos,
         cliente: formData.cliente.trim() || null,
         logo_url: logoPreview || null,
       };
+      const payloadEn = {
+        title: formData.titulo.trim(),
+        city: formData.ciudad,
+        rate: formData.tarifa.trim(),
+        description: formData.descripcion.trim() || null,
+        vehicles: formData.vehiculos,
+        requirements: requisitos,
+        client: formData.cliente.trim() || null,
+        logo: logoPreview || null,
+      };
 
       if (editingCampaign) {
-        const { error } = await supabase
-          .from('campaigns')
-          .update(payload)
-          .eq('id', editingCampaign.id);
+        const { error } = await saveWithSchemaFallback(
+          () => supabase.from('campaigns').update(payloadEs).eq('id', editingCampaign.id),
+          () => supabase.from('campaigns').update(payloadEn).eq('id', editingCampaign.id)
+        );
 
         if (error) {
           console.error('Error updating campaign:', error);
@@ -388,10 +423,10 @@ export function AdminPanel() {
         }
         toast.success(TEXTS.admin.panel.messages.success.campaignUpdated);
       } else {
-        const { error } = await supabase.from('campaigns').insert({
-          ...payload,
-          is_active: true,
-        });
+        const { error } = await saveWithSchemaFallback(
+          () => supabase.from('campaigns').insert({ ...payloadEs, is_active: true }),
+          () => supabase.from('campaigns').insert({ ...payloadEn, active: true })
+        );
 
         if (error) {
           console.error('Error creating campaign:', error);
@@ -444,17 +479,33 @@ export function AdminPanel() {
   };
 
   const handleDuplicate = async (campaign: Campaign) => {
-    const { error } = await supabase.from('campaigns').insert({
-      titulo: `${campaign.titulo} (copia)`,
-      ciudad: campaign.ciudad,
-      tarifa: campaign.tarifa,
-      descripcion: campaign.descripcion || null,
-      vehiculos: campaign.vehiculos,
-      requisitos: encodeRequisitos(campaign.flotista, campaign.mensajero),
-      logo_url: campaign.logoUrl || null,
-      cliente: campaign.cliente || null,
-      is_active: false,
-    });
+    const requisitos = encodeRequisitos(campaign.flotista, campaign.mensajero);
+    const { error } = await saveWithSchemaFallback(
+      () =>
+        supabase.from('campaigns').insert({
+          titulo: `${campaign.titulo} (copia)`,
+          ciudad: campaign.ciudad,
+          tarifa: campaign.tarifa,
+          descripcion: campaign.descripcion || null,
+          vehiculos: campaign.vehiculos,
+          requisitos,
+          logo_url: campaign.logoUrl || null,
+          cliente: campaign.cliente || null,
+          is_active: false,
+        }),
+      () =>
+        supabase.from('campaigns').insert({
+          title: `${campaign.titulo} (copy)`,
+          city: campaign.ciudad,
+          rate: campaign.tarifa,
+          description: campaign.descripcion || null,
+          vehicles: campaign.vehiculos,
+          requirements: requisitos,
+          logo: campaign.logoUrl || null,
+          client: campaign.cliente || null,
+          active: false,
+        })
+    );
 
     if (error) {
       console.error('Error duplicating campaign:', error);
@@ -501,10 +552,10 @@ export function AdminPanel() {
   };
 
   const toggleCampaignActive = async (id: string, currentState: boolean) => {
-    const { error } = await supabase
-      .from('campaigns')
-      .update({ is_active: !currentState })
-      .eq('id', id);
+    const { error } = await saveWithSchemaFallback(
+      () => supabase.from('campaigns').update({ is_active: !currentState }).eq('id', id),
+      () => supabase.from('campaigns').update({ active: !currentState }).eq('id', id)
+    );
 
     if (error) {
       console.error('Error toggling campaign:', error);
@@ -523,13 +574,13 @@ export function AdminPanel() {
       return;
     }
 
-    const { error } = await supabase
-      .from('campaigns')
-      .update({ is_active: true })
-      .in('id', idsToActivate);
+    const bulkActivate = await saveWithSchemaFallback(
+      () => supabase.from('campaigns').update({ is_active: true }).in('id', idsToActivate),
+      () => supabase.from('campaigns').update({ active: true }).in('id', idsToActivate)
+    );
 
-    if (error) {
-      console.error('Error activating campaigns:', error);
+    if (bulkActivate.error) {
+      console.error('Error activating campaigns:', bulkActivate.error);
       toast.error(TEXTS.admin.panel.messages.errors.bulkUpdateCampaigns);
       return;
     }
@@ -549,13 +600,13 @@ export function AdminPanel() {
       return;
     }
 
-    const { error } = await supabase
-      .from('campaigns')
-      .update({ is_active: false })
-      .in('id', idsToDeactivate);
+    const bulkDeactivate = await saveWithSchemaFallback(
+      () => supabase.from('campaigns').update({ is_active: false }).in('id', idsToDeactivate),
+      () => supabase.from('campaigns').update({ active: false }).in('id', idsToDeactivate)
+    );
 
-    if (error) {
-      console.error('Error deactivating campaigns:', error);
+    if (bulkDeactivate.error) {
+      console.error('Error deactivating campaigns:', bulkDeactivate.error);
       toast.error(TEXTS.admin.panel.messages.errors.bulkUpdateCampaigns);
       return;
     }
