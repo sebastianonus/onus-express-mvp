@@ -102,7 +102,7 @@ export function CampanaCard({ campana, onVer, onMeInteresa, isPostulado = false 
               <Badge 
                 key={idx}
                 variant="outline"
-                className="text-xs px-2 py-0.5 text-gray-700 border-gray-300"
+                className="text-xs px-2 py-0.5 text-gray-700 border-gray-300 max-w-full whitespace-normal break-words h-auto justify-start text-left min-w-0"
               >
                 {req}
               </Badge>
