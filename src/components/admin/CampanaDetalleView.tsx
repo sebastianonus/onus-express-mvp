@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, CheckCircle2, XCircle, User, Mail, Phone, Calendar, MessageSquare, AlertCircle, Download } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, XCircle, User, Mail, Phone, Calendar, MessageSquare, AlertCircle, Download, MapPin, DollarSign, Building2 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { toast } from 'sonner';
@@ -366,14 +366,17 @@ export function CampanaDetalleView({ campaignId, onBack }: CampanaDetalleViewPro
               </h1>
               <div className="flex flex-wrap gap-2 mb-3">
                 <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-300">
-                  ðŸ“ {campaign.ciudad}
+                  <MapPin className="w-3 h-3 mr-1" />
+                  {campaign.ciudad}
                 </Badge>
                 <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300">
-                  ðŸ’° {campaign.tarifa}
+                  <DollarSign className="w-3 h-3 mr-1" />
+                  {campaign.tarifa}
                 </Badge>
                 {campaign.cliente && (
                   <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-300">
-                    ðŸ¢ {campaign.cliente}
+                    <Building2 className="w-3 h-3 mr-1" />
+                    {campaign.cliente}
                   </Badge>
                 )}
               </div>
