@@ -342,3 +342,14 @@ WHERE p.user_id = auth.uid();
 
 - Se normalizo `package.json` para mantener formato consistente del archivo.
 - No hay cambios funcionales en la aplicacion.
+
+---
+
+## Actualizacion 2026-02-10 - Login Admin
+
+- Se implemento nueva pantalla de acceso de administracion con diseno dedicado (`/admin`).
+- Se protegió el panel admin moviendolo a `/admin/panel` con validacion de sesion local.
+- Se agrego utilitario de sesion admin en frontend (`src/utils/adminAuth.ts`).
+- Se actualizo logout del panel para cerrar sesion admin y redirigir al login.
+- Se agrego Edge Function `admin-login` para validacion server-side del PIN usando el secret `ADMIN_PIN`.
+- Build de produccion validado correctamente con `npm run build`.

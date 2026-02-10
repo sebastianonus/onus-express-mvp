@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, useNavigate, Link } from 'react-router-dom';
+import { useEffect, type ReactElement } from 'react';
+import { BrowserRouter as Router, Routes, Route, useNavigate, Link, Navigate } from 'react-router-dom';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import { Home } from './components/Home';
@@ -18,6 +18,7 @@ import { RecuperarContrasenaClientes } from './components/RecuperarContrasenaCli
 import { CorreoEnviadoClientes } from './components/CorreoEnviadoClientes';
 import { NuevaContrasenaClientes } from './components/NuevaContrasenaClientes';
 import { AdminPanel } from './components/AdminPanel';
+import { AdminLogin } from './components/AdminLogin';
 import { WhatsAppButton } from './components/WhatsAppButton';
 import { PrivacyPolicy } from './components/PrivacyPolicy';
 import { TermsConditions } from './components/TermsConditions';
@@ -27,7 +28,15 @@ import { CookieBanner } from './components/CookieBanner';
 import { Toaster } from 'sonner@2.0.3';
 import { Settings } from 'lucide-react';
 import { initTracking } from './utils/analytics';
+import { isAdminSessionActive } from './utils/adminAuth';
 import './styles/globals.css';
+
+function AdminProtectedRoute({ children }: { children: ReactElement }) {
+  if (!isAdminSessionActive()) {
+    return <Navigate to="/admin" replace />;
+  }
+  return children;
+}
 
 function MainLayout() {
   const navigate = useNavigate();
@@ -83,7 +92,15 @@ export default function App() {
   return (
     <Router>
       <Routes>
-        <Route path="/admin" element={<AdminPanel />} />
+        <Route path="/admin" element={<AdminLogin />} />
+        <Route
+          path="/admin/panel"
+          element={
+            <AdminProtectedRoute>
+              <AdminPanel />
+            </AdminProtectedRoute>
+          }
+        />
 
         <Route path="/mensajeros/acceso" element={<MensajerosLogin />} />
         <Route path="/mensajeros/recuperar-contrasena" element={<RecuperarContrasena />} />

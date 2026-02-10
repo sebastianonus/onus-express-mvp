@@ -15,7 +15,7 @@ import { toast } from 'sonner@2.0.3';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
 import { TEXTS } from '@/content/texts';
 import { useRequireRole } from '../hooks/useRequireRole';
-import { logout as authLogout } from '../utils/auth';
+import { clearAdminSession } from '../utils/adminAuth';
 
 /**
  * COMPONENTE: Panel de Administración - Frontend limpio sin backend
@@ -142,8 +142,8 @@ export function AdminPanel() {
   const hasActiveFilters = searchCliente !== 'all' || searchCiudad !== 'all' || searchDescripcion !== '' || searchTarifa !== '';
 
   const handleLogout = () => {
-    authLogout();
-    navigate('/');
+    clearAdminSession();
+    navigate('/admin');
   };
 
   const deleteAllCampaigns = () => {
