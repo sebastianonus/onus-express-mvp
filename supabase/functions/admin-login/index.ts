@@ -6,6 +6,17 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
+const allowedOrigins = (Deno.env.get('ALLOWED_ORIGINS') ?? '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+const isOriginAllowed = (origin: string | null): boolean => {
+  if (!origin) return true;
+  if (allowedOrigins.length === 0) return true;
+  return allowedOrigins.includes(origin);
+};
+
 function secureCompare(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
   let result = 0;
@@ -16,8 +27,17 @@ function secureCompare(a: string, b: string): boolean {
 }
 
 Deno.serve(async (req) => {
+  const origin = req.headers.get('origin');
+
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
+  }
+
+  if (!isOriginAllowed(origin)) {
+    return new Response(JSON.stringify({ ok: false, error: 'ORIGIN_NOT_ALLOWED' }), {
+      status: 403,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
 
   if (req.method !== 'POST') {

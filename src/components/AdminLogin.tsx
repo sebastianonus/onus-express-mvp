@@ -6,7 +6,7 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { TEXTS } from '@/content/texts';
 import { supabase } from '../supabase';
-import { setAdminPin, setAdminSession } from '../utils/adminAuth';
+import { setAdminSession } from '../utils/adminAuth';
 
 export function AdminLogin() {
   const navigate = useNavigate();
@@ -35,7 +35,6 @@ export function AdminLogin() {
       }
 
       setAdminSession();
-      setAdminPin(pin.trim());
       navigate('/admin/panel');
     } catch {
       setError(TEXTS.admin.panel.login.pinError);

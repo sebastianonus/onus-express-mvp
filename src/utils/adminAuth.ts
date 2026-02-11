@@ -1,5 +1,4 @@
 const ADMIN_SESSION_KEY = 'onus_admin_auth';
-const ADMIN_PIN_KEY = 'onus_admin_pin';
 const ADMIN_SESSION_TTL_MS = 8 * 60 * 60 * 1000;
 
 type AdminSession = {
@@ -23,7 +22,6 @@ export function setAdminSession(): void {
 export function clearAdminSession(): void {
   if (!isBrowser()) return;
   window.sessionStorage.removeItem(ADMIN_SESSION_KEY);
-  window.sessionStorage.removeItem(ADMIN_PIN_KEY);
 }
 
 export function isAdminSessionActive(): boolean {
@@ -42,11 +40,11 @@ export function isAdminSessionActive(): boolean {
 }
 
 export function setAdminPin(pin: string): void {
-  if (!isBrowser()) return;
-  window.sessionStorage.setItem(ADMIN_PIN_KEY, pin);
+  // Seguridad: no persistir PIN de admin en storage del navegador.
+  void pin;
 }
 
 export function getAdminPin(): string {
-  if (!isBrowser()) return '';
-  return window.sessionStorage.getItem(ADMIN_PIN_KEY) ?? '';
+  // Mantiene compatibilidad de API sin exponer credenciales en storage.
+  return '';
 }
