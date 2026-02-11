@@ -1285,6 +1285,8 @@ export const TEXTS = {
         noDataToExport: "No hay postulaciones para exportar",
         applicationAccepted: "Postulación aceptada correctamente",
         applicationRejected: "Postulación rechazada correctamente",
+        updateSuccess: "Estado de la postulación actualizado correctamente",
+        updateError: "Error al actualizar el estado de la postulación",
         exportSuccess: "{count} postulaciones exportadas correctamente",
         exportError: "Error al exportar los datos",
         updatePendingIntegration: "Función de actualización pendiente de integración con backend",

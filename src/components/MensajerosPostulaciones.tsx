@@ -50,6 +50,7 @@ export function MensajerosPostulaciones() {
   const navigate = useNavigate();
   const [mensajero, setMensajero] = useState<MensajeroAuth | null>(null);
   const [postulaciones, setPostulaciones] = useState<Postulacion[]>([]);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   useEffect(() => {
     const init = async () => {
@@ -72,6 +73,7 @@ export function MensajerosPostulaciones() {
         navigate('/mensajeros/acceso');
         return;
       }
+      setCurrentUserId(session.user.id);
 
       setMensajero({
         codigo: String(session.user.user_metadata?.codigo ?? '—'),
@@ -84,7 +86,8 @@ export function MensajerosPostulaciones() {
 
       const { data: posts, error: postsErr } = await supabase
         .from('postulaciones')
-        .select('id, user_id, campaign_id, created_at, estado, mensaje');
+        .select('id, user_id, campaign_id, created_at, estado, mensaje')
+        .eq('user_id', session.user.id);
 
       if (postsErr) {
         console.error('Error cargando postulaciones:', postsErr);
@@ -166,6 +169,105 @@ export function MensajerosPostulaciones() {
 
     void init();
   }, [navigate]);
+
+  useEffect(() => {
+    if (!supabase || !currentUserId) return;
+
+    const channel = supabase
+      .channel(`mensajero-postulaciones-${currentUserId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'postulaciones',
+          filter: `user_id=eq.${currentUserId}`,
+        },
+        async () => {
+          const { data: posts, error: postsErr } = await supabase
+            .from('postulaciones')
+            .select('id, user_id, campaign_id, created_at, estado, mensaje')
+            .eq('user_id', currentUserId);
+
+          if (postsErr) {
+            console.error('Error refrescando postulaciones:', postsErr);
+            return;
+          }
+
+          const campaignIds = Array.from(
+            new Set((posts ?? []).map((p: any) => String(p.campaign_id)).filter(Boolean))
+          );
+
+          let campaignNameById = new Map<string, string>();
+          if (campaignIds.length > 0) {
+            const { data: camps } = await supabase
+              .from('campaigns')
+              .select('id, nombre, titulo, title')
+              .in('id', campaignIds);
+
+            campaignNameById = new Map(
+              (camps ?? []).map((c: any) => [String(c.id), String(c.nombre ?? c.titulo ?? c.title ?? 'Campaña')])
+            );
+          }
+
+          const mapped: Postulacion[] = (posts ?? []).map((p: any) => {
+            const rawEstado = String(p.estado ?? 'pending');
+            const estado =
+              rawEstado === 'Aceptado' || rawEstado === 'accepted'
+                ? 'Aceptado'
+                : rawEstado === 'Rechazado' || rawEstado === 'rejected'
+                  ? 'Rechazado'
+                  : 'En revisiÃ³n';
+
+            const rawMensaje = typeof p.mensaje === 'string' ? p.mensaje : '';
+            const lineas = rawMensaje.split('\n').map((linea: string) => linea.trim());
+            const motivacion =
+              lineas
+                .find((l: string) => l.toLowerCase().startsWith('motivaci'))
+                ?.split(':')
+                .slice(1)
+                .join(':')
+                .trim() || undefined;
+            const experiencia =
+              lineas
+                .find((l: string) => l.toLowerCase().startsWith('experiencia'))
+                ?.split(':')
+                .slice(1)
+                .join(':')
+                .trim() || undefined;
+            const disponibilidad =
+              lineas
+                .find((l: string) => l.toLowerCase().startsWith('disponibilidad'))
+                ?.split(':')
+                .slice(1)
+                .join(':')
+                .trim() || undefined;
+
+            return {
+              id: String(p.id),
+              user_id: String(p.user_id),
+              campaign_id: String(p.campaign_id),
+              campanaNombre: campaignNameById.get(String(p.campaign_id)) ?? 'CampaÃ±a',
+              fecha: String(p.created_at ?? new Date().toISOString()),
+              estado,
+              motivacion,
+              experiencia,
+              disponibilidad,
+              mensaje: rawMensaje || undefined,
+            };
+          });
+
+          setPostulaciones(
+            mapped.sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
+          );
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [currentUserId]);
 
   const handleLogout = async () => {
     if (supabase) await supabase.auth.signOut();
