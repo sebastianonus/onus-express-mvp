@@ -8,6 +8,7 @@ import { MessageCircle, Mail, Phone, CheckCircle2 } from 'lucide-react';
 import backgroundImg from 'figma:asset/e4d65246763c398c8158c537a32f609404b085bd.png';
 import { TEXTS } from '@/content/texts';
 import { supabase } from '../supabase';
+import { insertWithSchemaMatch } from '../utils/supabaseInsertMatch';
 
 export function Contacto() {
   const [searchParams] = useSearchParams();
@@ -44,11 +45,9 @@ export function Contacto() {
     setError('');
 
     try {
-      const basePayload = {
-        nombre: formData.nombre.trim(),
-        telefono: formData.telefono.trim(),
-        email: formData.email.trim(),
-      };
+      const nombre = formData.nombre.trim();
+      const telefono = formData.telefono.trim();
+      const email = formData.email.trim();
       const enrichedMessage = [
         formData.empresa.trim() ? `Empresa: ${formData.empresa.trim()}` : '',
         `Contexto: ${getContextualText()}`,
@@ -58,24 +57,22 @@ export function Contacto() {
         .filter(Boolean)
         .join('\n');
 
-      const payloadMain = {
-        ...basePayload,
-        mensaje: enrichedMessage,
-      };
-      const payloadMin = {
-        ...basePayload,
-      };
+      const variants: Record<string, unknown>[] = [
+        { nombre, telefono, email, mensaje: enrichedMessage },
+        { name: nombre, phone: telefono, email, message: enrichedMessage },
+        { full_name: nombre, phone: telefono, email, message: enrichedMessage },
+        { nombre, telefono, email },
+        { name: nombre, phone: telefono, email },
+        { telefono, email, mensaje: enrichedMessage },
+        { phone: telefono, email, message: enrichedMessage },
+        { email, mensaje: enrichedMessage },
+        { email, message: enrichedMessage },
+      ];
 
-      let insertError: unknown = null;
-      const first = await supabase.from('contactos').insert(payloadMain);
-      insertError = first.error;
-      if (insertError) {
-        const second = await supabase.from('contactos').insert(payloadMin);
-        insertError = second.error;
-      }
-      if (insertError) {
-        throw insertError;
-      }
+      await insertWithSchemaMatch('contactos', variants, async (table, payload) => {
+        const result = await supabase.from(table).insert(payload);
+        return { error: result.error };
+      });
 
       setSubmitted(true);
     } catch (err) {
