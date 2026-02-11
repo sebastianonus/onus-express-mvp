@@ -1295,7 +1295,7 @@ export const TEXTS = {
       
       whatsapp: {
         greeting: "Hola {firstName}, soy del equipo de ONUS Express.\n\n",
-        acceptedMessage: "¡Buenas noticias! Tu postulación para la campaña \"{campaignTitle}\" ha sido ACEPTADA ✅\n\nEn breve nos pondremos en contacto contigo para coordinar los siguientes pasos.",
+        acceptedMessage: "¡Buenas noticias! Tu postulación para la campaña \"{campaignTitle}\" ha sido ACEPTADA \n\nEn breve nos pondremos en contacto contigo para coordinar los siguientes pasos.",
         rejectedMessage: "Gracias por tu interés en la campaña \"{campaignTitle}\".\n\nEn esta ocasión no has sido seleccionado, pero te animamos a seguir explorando otras oportunidades en ONUS Express.",
       },
       
