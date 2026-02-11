@@ -377,6 +377,7 @@ export const TarifarioUltimaMilla = forwardRef<TarifarioUltimaMillaHandle, Tarif
 
       if (!emailResult.success) {
         console.error('Error enviando presupuesto por email:', emailResult.message);
+        alert(emailResult.message);
       }
     } catch (error) {
       console.error('Error generando PDF:', error);
