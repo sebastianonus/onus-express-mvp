@@ -186,9 +186,16 @@ export function CampanaDetalleView({ campaignId, onBack }: CampanaDetalleViewPro
     }
 
     try {
-      const res = await fetch(
+      const endpointCandidates = [
         `${supabaseUrl}/functions/v1/server/make-server-372a0974/admin/update-postulacion-status`,
-        {
+        `${supabaseUrl}/functions/v1/server/admin/update-postulacion-status`,
+      ];
+
+      let lastErrorMessage = '';
+      let updatedOk = false;
+
+      for (const endpoint of endpointCandidates) {
+        const res = await fetch(endpoint, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -200,12 +207,32 @@ export function CampanaDetalleView({ campaignId, onBack }: CampanaDetalleViewPro
             postulacionId,
             estado: dbStatus,
           }),
+        });
+
+        const raw = await res.text();
+        let json: any = null;
+        try {
+          json = raw ? JSON.parse(raw) : null;
+        } catch {
+          json = null;
         }
-      );
-      const json = await res.json();
-      if (!res.ok || json?.error) {
-        console.error('Error updating postulacion estado:', json);
-        toast.error(json?.error ?? TEXTS.admin.campanaDetalle.toasts.updateError);
+
+        if (res.ok && !json?.error) {
+          updatedOk = true;
+          break;
+        }
+
+        if (res.status === 404) {
+          lastErrorMessage = `Ruta no encontrada en función server: ${endpoint}`;
+          continue;
+        }
+
+        lastErrorMessage = json?.error ?? raw ?? `HTTP ${res.status}`;
+      }
+
+      if (!updatedOk) {
+        console.error('Error updating postulacion estado:', lastErrorMessage);
+        toast.error(lastErrorMessage || TEXTS.admin.campanaDetalle.toasts.updateError);
         setUpdatingId(null);
         return;
       }
