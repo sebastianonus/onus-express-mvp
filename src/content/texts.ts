@@ -443,6 +443,7 @@ export const TEXTS = {
           supabaseConfigError: "Configuración de Supabase incompleta",
           magicLinkFailed: "No se pudo enviar el enlace. Revisa el email e inténtalo de nuevo.",
           magicLinkRetry: "No se pudo enviar el enlace. Intenta nuevamente.",
+          sessionExpired24h: "Tu sesiÃ³n de mensajero expirÃ³ (24h). Vuelve a ingresar con Magic Link.",
           registerFailed: "No se pudo enviar la solicitud. Intenta nuevamente.",
           registerUnexpectedError: "Error al registrar. Intenta nuevamente.",
         },

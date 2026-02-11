@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createClient } from '@supabase/supabase-js';
 import { Input } from './ui/input';
@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import backgroundImage from 'figma:asset/4261f3db5c66ef3456a8ebcae9838917a1e10ea5.png';
 import logo from 'figma:asset/e80d7ef4ac3b9441721d6916cfc8ad34baf40db1.png';
 import { TEXTS } from '@/content/texts';
+import { clearMensajeroSessionWindow, ensureMensajeroSessionWindow, isMensajeroSessionExpired } from '../utils/mensajerosSession';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
@@ -47,6 +48,33 @@ export function MensajerosLogin() {
     flotista: '',
   });
   const [formLoading, setFormLoading] = useState(false);
+
+  useEffect(() => {
+    const init = async () => {
+      if (!supabase) return;
+      const { data } = await supabase.auth.getSession();
+      const session = data.session;
+      if (!session?.user) return;
+
+      const role = session.user.app_metadata?.role;
+      if (role !== 'mensajero') {
+        await supabase.auth.signOut();
+        clearMensajeroSessionWindow();
+        return;
+      }
+
+      if (isMensajeroSessionExpired(session)) {
+        await supabase.auth.signOut();
+        clearMensajeroSessionWindow();
+        return;
+      }
+
+      ensureMensajeroSessionWindow(session);
+      navigate('/mensajeros', { replace: true });
+    };
+
+    void init();
+  }, [navigate]);
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

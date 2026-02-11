@@ -28,6 +28,7 @@ import { toast } from 'sonner';
 import { CampanaCard } from './CampanaCard';
 import { TEXTS } from '@/content/texts';
 import { useRequireRole } from '../hooks/useRequireRole';
+import { clearMensajeroSessionWindow, ensureMensajeroSessionWindow, isMensajeroSessionExpired } from '../utils/mensajerosSession';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
@@ -148,9 +149,19 @@ export function MensajerosSesion() {
       const role = session.user.app_metadata?.role;
       if (role !== 'mensajero') {
         await supabase.auth.signOut();
+        clearMensajeroSessionWindow();
         navigate('/mensajeros/acceso');
         return;
       }
+
+      if (isMensajeroSessionExpired(session)) {
+        await supabase.auth.signOut();
+        clearMensajeroSessionWindow();
+        toast.error(TEXTS.couriers.login.feedback.errors.sessionExpired24h);
+        navigate('/mensajeros/acceso');
+        return;
+      }
+      ensureMensajeroSessionWindow(session);
 
       setMensajero({
         codigo: String(session.user.user_metadata?.codigo ?? '—'),
@@ -239,6 +250,7 @@ export function MensajerosSesion() {
     if (supabase) {
       await supabase.auth.signOut();
     }
+    clearMensajeroSessionWindow();
     navigate('/mensajeros/acceso');
   };
 

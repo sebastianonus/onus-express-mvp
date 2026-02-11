@@ -15,6 +15,8 @@ import {
 import backgroundImage from 'figma:asset/4261f3db5c66ef3456a8ebcae9838917a1e10ea5.png';
 import { TEXTS } from '@/content/texts';
 import { useRequireRole } from '../hooks/useRequireRole';
+import { toast } from 'sonner';
+import { clearMensajeroSessionWindow, ensureMensajeroSessionWindow, isMensajeroSessionExpired } from '../utils/mensajerosSession';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
@@ -70,9 +72,18 @@ export function MensajerosPostulaciones() {
       const role = session.user.app_metadata?.role;
       if (role !== 'mensajero') {
         await supabase.auth.signOut();
+        clearMensajeroSessionWindow();
         navigate('/mensajeros/acceso');
         return;
       }
+      if (isMensajeroSessionExpired(session)) {
+        await supabase.auth.signOut();
+        clearMensajeroSessionWindow();
+        toast.error(TEXTS.couriers.login.feedback.errors.sessionExpired24h);
+        navigate('/mensajeros/acceso');
+        return;
+      }
+      ensureMensajeroSessionWindow(session);
       setCurrentUserId(session.user.id);
 
       setMensajero({
@@ -271,6 +282,7 @@ export function MensajerosPostulaciones() {
 
   const handleLogout = async () => {
     if (supabase) await supabase.auth.signOut();
+    clearMensajeroSessionWindow();
     navigate('/mensajeros/acceso');
   };
 
