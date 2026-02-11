@@ -270,8 +270,51 @@ export function AdminPanel() {
 
   const hasActiveFilters = searchCliente !== 'all' || searchCiudad !== 'all' || searchDescripcion !== '' || searchTarifa !== '';
 
-  const functionsBaseUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/server/make-server-372a0974/admin`;
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+  const functionsBaseCandidates = [
+    `${supabaseUrl}/functions/v1/server/make-server-372a0974/admin`,
+    `${supabaseUrl}/functions/v1/server/admin`,
+    `${supabaseUrl}/functions/v1/make-server-372a0974/admin`,
+  ];
   const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+
+  const callAdminFunction = async (path: 'pending-profiles' | 'create-user', body: Record<string, unknown>) => {
+    if (!supabaseUrl) {
+      return { ok: false, json: { error: TEXTS.admin.panel.profiles.errors.missingConfig } };
+    }
+
+    for (const base of functionsBaseCandidates) {
+      const endpoint = `${base}/${path}`;
+      try {
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(anonKey ? { apikey: anonKey, Authorization: `Bearer ${anonKey}` } : {}),
+          },
+          body: JSON.stringify(body),
+        });
+
+        const raw = await res.text();
+        let json: any = null;
+        try {
+          json = raw ? JSON.parse(raw) : {};
+        } catch {
+          json = { error: `${TEXTS.admin.panel.profiles.errors.invalidResponse} (${res.status})` };
+        }
+
+        if (res.status === 404) {
+          continue;
+        }
+
+        return { ok: res.ok, json };
+      } catch {
+        // Intenta siguiente ruta candidata
+      }
+    }
+
+    return { ok: false, json: { error: TEXTS.admin.panel.profiles.errors.edgeRouteNotFound } };
+  };
 
   const fetchPendingProfiles = async () => {
     if (!adminOpsPin.trim()) {
@@ -285,17 +328,10 @@ export function AdminPanel() {
 
     setLoadingProfiles(true);
     try {
-      const res = await fetch(`${functionsBaseUrl}/pending-profiles`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          apikey: anonKey,
-          Authorization: `Bearer ${anonKey}`,
-        },
-        body: JSON.stringify({ pin: adminOpsPin.trim() }),
+      const { ok, json } = await callAdminFunction('pending-profiles', {
+        pin: adminOpsPin.trim(),
       });
-      const json = await res.json();
-      if (!res.ok || json?.error) {
+      if (!ok || json?.error) {
         toast.error(json?.error ?? TEXTS.admin.panel.profiles.errors.load);
         return;
       }
@@ -321,25 +357,16 @@ export function AdminPanel() {
     const rowKey = `${profile.source}:${profile.id}:${role}`;
     setCreatingUserKey(rowKey);
     try {
-      const res = await fetch(`${functionsBaseUrl}/create-user`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          apikey: anonKey,
-          Authorization: `Bearer ${anonKey}`,
-        },
-        body: JSON.stringify({
-          pin: adminOpsPin.trim(),
-          email: profile.email,
-          nombre: profile.nombre,
-          telefono: profile.telefono,
-          role,
-          source: profile.source,
-          sourceId: profile.id,
-        }),
+      const { ok, json } = await callAdminFunction('create-user', {
+        pin: adminOpsPin.trim(),
+        email: profile.email,
+        nombre: profile.nombre,
+        telefono: profile.telefono,
+        role,
+        source: profile.source,
+        sourceId: profile.id,
       });
-      const json = await res.json();
-      if (!res.ok || json?.error) {
+      if (!ok || json?.error) {
         toast.error(json?.error ?? TEXTS.admin.panel.profiles.errors.create);
         return;
       }

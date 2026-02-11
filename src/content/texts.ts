@@ -1443,6 +1443,8 @@ export const TEXTS = {
           missingPinLoad: "Ingresa el PIN para cargar perfiles",
           missingPinCreate: "Ingresa el PIN para crear usuarios",
           missingConfig: "Falta configuración de Supabase",
+          edgeRouteNotFound: "No se encontró la ruta del backend admin (Edge Function). Verifica el deploy de la función server.",
+          invalidResponse: "El backend devolvió una respuesta inválida",
           load: "No se pudieron cargar perfiles",
           loadGeneric: "Error cargando perfiles pendientes",
           create: "No se pudo crear el usuario",
