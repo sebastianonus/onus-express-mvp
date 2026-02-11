@@ -281,7 +281,7 @@ export function AdminPanel() {
   const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 
   const callAdminFunction = async (
-    path: 'pending-profiles' | 'create-user' | 'get-client-password' | 'reset-client-password',
+    path: 'pending-profiles' | 'create-user' | 'reset-client-password',
     body: Record<string, unknown>,
   ) => {
     if (!supabaseUrl) {
@@ -389,37 +389,6 @@ export function AdminPanel() {
       toast.error(TEXTS.admin.panel.profiles.errors.createGeneric);
     } finally {
       setCreatingUserKey(null);
-    }
-  };
-
-  const viewClientPassword = async (profile: PendingProfile) => {
-    if (!adminOpsPin.trim()) {
-      toast.error(TEXTS.admin.panel.profiles.errors.missingPinCreate);
-      return;
-    }
-    if (!anonKey) {
-      toast.error(TEXTS.admin.panel.profiles.errors.missingConfig);
-      return;
-    }
-
-    try {
-      const { ok, json } = await callAdminFunction('get-client-password', {
-        pin: adminOpsPin.trim(),
-        email: profile.email,
-      });
-      if (!ok || json?.error) {
-        toast.error(json?.error ?? TEXTS.admin.panel.profiles.errors.getClientPassword);
-        return;
-      }
-      const pwd = String(json?.credential?.password_visible ?? '');
-      if (!pwd) {
-        toast.error(TEXTS.admin.panel.profiles.errors.getClientPassword);
-        return;
-      }
-      toast.success(`${TEXTS.admin.panel.profiles.success.passwordLabel} ${pwd}`);
-    } catch (err) {
-      console.error('Error consultando clave cliente:', err);
-      toast.error(TEXTS.admin.panel.profiles.errors.getClientPasswordGeneric);
     }
   };
 
@@ -1062,14 +1031,6 @@ export function AdminPanel() {
                                     onClick={() => createUserFromProfile(profile, 'cliente')}
                                   >
                                     {TEXTS.admin.panel.profiles.actions.createClient}
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="border-[#00C9CE] text-[#00C9CE]"
-                                    onClick={() => viewClientPassword(profile)}
-                                  >
-                                    {TEXTS.admin.panel.profiles.actions.viewClientPassword}
                                   </Button>
                                   <Button
                                     size="sm"

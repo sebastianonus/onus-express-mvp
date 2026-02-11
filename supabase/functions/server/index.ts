@@ -7,6 +7,17 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
 };
 
+const allowedOrigins = (Deno.env.get("ALLOWED_ORIGINS") ?? "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+const isOriginAllowed = (origin: string | null): boolean => {
+  if (!origin) return true;
+  if (allowedOrigins.length === 0) return true;
+  return allowedOrigins.includes(origin);
+};
+
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL") ?? "",
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
@@ -14,8 +25,17 @@ const supabase = createClient(
 
 const adminPanelPin = Deno.env.get("ADMIN_PANEL_PIN") ?? Deno.env.get("ADMIN_PIN") ?? "";
 
+function secureCompare(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let result = 0;
+  for (let i = 0; i < a.length; i += 1) {
+    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return result === 0;
+}
+
 const isAdminPinValid = (pin?: string) =>
-  Boolean(adminPanelPin) && Boolean(pin) && pin === adminPanelPin;
+  Boolean(adminPanelPin) && Boolean(pin) && secureCompare(String(pin), adminPanelPin);
 
 const json = (payload: unknown, status = 200) =>
   new Response(JSON.stringify(payload), {
@@ -32,18 +52,18 @@ const generateTemporaryPassword = (length = 14): string => {
   return password;
 };
 
-const persistClientVisiblePassword = async (
+const persistClientCredentialAudit = async (
+  action: "created" | "reset",
   userId: string,
   email: string,
-  passwordVisible: string,
   source: string,
   sourceId: string,
   origenFormulario: string,
 ) => {
   const payload = {
+    action,
     user_id: userId,
     email,
-    password_visible: passwordVisible,
     source: source || null,
     source_id: sourceId || null,
     origen_formulario: origenFormulario || null,
@@ -51,7 +71,7 @@ const persistClientVisiblePassword = async (
   };
 
   const { error } = await supabase
-    .from("clientes_credenciales")
+    .from("clientes_credenciales_audit")
     .upsert(payload, { onConflict: "user_id" });
 
   if (!error) return;
@@ -235,19 +255,17 @@ const handleCreateUser = async (req: Request) => {
         }
       }
 
-      if (generatedPassword) {
-        try {
-          await persistClientVisiblePassword(
-            data.user.id,
-            email,
-            generatedPassword,
-            source,
-            sourceId,
-            origenFormulario,
-          );
-        } catch (persistErr) {
-          return json({ error: (persistErr as Error).message }, 500);
-        }
+      try {
+        await persistClientCredentialAudit(
+          "created",
+          data.user.id,
+          email,
+          source,
+          sourceId,
+          origenFormulario,
+        );
+      } catch (persistErr) {
+        return json({ error: (persistErr as Error).message }, 500);
       }
     }
   }
@@ -328,10 +346,10 @@ const handleResetClientPassword = async (req: Request) => {
   if (resetErr) return json({ error: resetErr.message }, 500);
 
   try {
-    await persistClientVisiblePassword(
+    await persistClientCredentialAudit(
+      "reset",
       targetUserId,
       targetEmail || String(userById.user.email ?? ""),
-      generatedPassword,
       "admin_reset",
       "",
       "admin_reset",
@@ -356,31 +374,10 @@ const handleResetClientPassword = async (req: Request) => {
   });
 };
 
-const handleGetClientPassword = async (req: Request) => {
-  const body = await req.json().catch(() => ({}));
-  const pin = body?.pin as string | undefined;
-  const email = String(body?.email ?? "").trim().toLowerCase();
-  const userId = String(body?.userId ?? "").trim();
-
-  if (!isAdminPinValid(pin)) return json({ error: "PIN invalido" }, 401);
-  if (!email && !userId) return json({ error: "email o userId requerido" }, 400);
-
-  let query = supabase.from("clientes_credenciales").select("user_id,email,password_visible,updated_at").limit(1);
-  if (userId) {
-    query = query.eq("user_id", userId);
-  } else {
-    query = query.ilike("email", email);
-  }
-
-  const { data, error } = await query.maybeSingle();
-  if (error) return json({ error: error.message }, 500);
-  if (!data) return json({ error: "No hay clave visible guardada para este cliente" }, 404);
-
-  return json({ success: true, credential: data });
-};
-
 Deno.serve(async (req) => {
+  const origin = req.headers.get("origin");
   if (req.method === "OPTIONS") return new Response("ok", { status: 200, headers: corsHeaders });
+  if (!isOriginAllowed(origin)) return json({ error: "ORIGIN_NOT_ALLOWED" }, 403);
 
   const { pathname } = new URL(req.url);
 
@@ -402,10 +399,6 @@ Deno.serve(async (req) => {
 
   if (req.method === "POST" && (pathname.endsWith("/admin/reset-client-password") || pathname.endsWith("/make-server-372a0974/admin/reset-client-password"))) {
     return await handleResetClientPassword(req);
-  }
-
-  if (req.method === "POST" && (pathname.endsWith("/admin/get-client-password") || pathname.endsWith("/make-server-372a0974/admin/get-client-password"))) {
-    return await handleGetClientPassword(req);
   }
 
   return json({ error: "NOT_FOUND", path: pathname }, 404);
