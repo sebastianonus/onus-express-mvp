@@ -153,11 +153,22 @@ export function CampanaDetalleView({ campaignId, onBack }: CampanaDetalleViewPro
         cliente: String((campaignRow as any).cliente ?? (campaignRow as any).client ?? ''),
       });
 
-      const { data: postsRows, error: postsErr } = await supabase
+      let { data: postsRows, error: postsErr } = await supabase
         .from('postulaciones')
-        .select('id, user_id, campaign_id, created_at, estado, mensaje')
+        .select('id, user_id, campaign_id, created_at, estado, mensaje, nombre, email, telefono')
         .eq('campaign_id', campaignId)
         .order('created_at', { ascending: false });
+
+      // Compatibilidad con esquemas donde postulaciones no tiene nombre/email/telefono.
+      if (postsErr && String((postsErr as { code?: string }).code ?? '') === '42703') {
+        const fallback = await supabase
+          .from('postulaciones')
+          .select('id, user_id, campaign_id, created_at, estado, mensaje')
+          .eq('campaign_id', campaignId)
+          .order('created_at', { ascending: false });
+        postsRows = fallback.data as any;
+        postsErr = fallback.error;
+      }
 
       if (postsErr) {
         console.error('Error loading postulaciones detail:', postsErr);
@@ -201,11 +212,12 @@ export function CampanaDetalleView({ campaignId, onBack }: CampanaDetalleViewPro
           campaign_id: String(row.campaign_id ?? campaignId),
           mensajeroNombre:
             profile?.nombre ||
+            String(row.nombre ?? '').trim() ||
             profile?.email ||
             userId ||
             TEXTS.admin.campanaDetalle.defaults.courierName,
-          mensajeroEmail: profile?.email ?? '',
-          mensajeroTelefono: profile?.telefono ?? '',
+          mensajeroEmail: profile?.email ?? String(row.email ?? '').trim(),
+          mensajeroTelefono: profile?.telefono ?? String(row.telefono ?? '').trim(),
           fecha: String(row.created_at ?? new Date().toISOString()),
           estado: dbEstadoToUi(row.estado),
           motivacion: parsed.motivacion,

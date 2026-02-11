@@ -79,10 +79,15 @@ export function MensajerosPostulaciones() {
       }
       ensureMensajeroSessionWindow(session);
       setCurrentUserId(session.user.id);
+      const codigo = String(session.user.user_metadata?.codigo ?? '').trim();
 
       setMensajero({
-        codigo: String(session.user.user_metadata?.codigo ?? '—'),
-        nombre: String(session.user.user_metadata?.nombre ?? session.user.email ?? 'Mensajero'),
+        codigo,
+        nombre: String(
+          session.user.user_metadata?.nombre ??
+            session.user.email ??
+            TEXTS.couriers.applications.defaults.courierName
+        ),
         email: session.user.email ?? '',
         telefono: String(session.user.user_metadata?.telefono ?? ''),
         activo: true,
@@ -115,7 +120,15 @@ export function MensajerosPostulaciones() {
           console.error('Error cargando campañas:', campsErr);
         } else {
           campaignNameById = new Map(
-            (camps ?? []).map((c: any) => [String(c.id), String(c.nombre ?? c.titulo ?? c.title ?? 'Campaña')])
+            (camps ?? []).map((c: any) => [
+              String(c.id),
+              String(
+                c.nombre ??
+                  c.titulo ??
+                  c.title ??
+                  TEXTS.couriers.applications.defaults.campaignTitle
+              ),
+            ])
           );
         }
       }
@@ -157,7 +170,9 @@ export function MensajerosPostulaciones() {
           id: String(p.id),
           user_id: String(p.user_id),
           campaign_id: String(p.campaign_id),
-          campanaNombre: campaignNameById.get(String(p.campaign_id)) ?? 'Campaña',
+          campanaNombre:
+            campaignNameById.get(String(p.campaign_id)) ??
+            TEXTS.couriers.applications.defaults.campaignTitle,
           fecha: String(p.created_at ?? new Date().toISOString()),
           estado,
           motivacion,
@@ -211,7 +226,15 @@ export function MensajerosPostulaciones() {
               .in('id', campaignIds);
 
             campaignNameById = new Map(
-              (camps ?? []).map((c: any) => [String(c.id), String(c.nombre ?? c.titulo ?? c.title ?? 'Campaña')])
+              (camps ?? []).map((c: any) => [
+                String(c.id),
+                String(
+                  c.nombre ??
+                    c.titulo ??
+                    c.title ??
+                    TEXTS.couriers.applications.defaults.campaignTitle
+                ),
+              ])
             );
           }
 
@@ -343,8 +366,14 @@ export function MensajerosPostulaciones() {
                 {TEXTS.couriers.applications.header.title}
               </h1>
               <p className="text-gray-300">
-                {mensajero.nombre} • Código:{' '}
-                <span className="font-mono text-[#00C9CE]">{mensajero.codigo}</span>
+                {mensajero.nombre}
+                {mensajero.codigo && (
+                  <>
+                    {' • '}
+                    {TEXTS.couriers.applications.header.codeLabel}{' '}
+                    <span className="font-mono text-[#00C9CE]">{mensajero.codigo}</span>
+                  </>
+                )}
               </p>
             </div>
             <Button

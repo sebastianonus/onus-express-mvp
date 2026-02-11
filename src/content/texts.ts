@@ -579,6 +579,7 @@ export const TEXTS = {
           whatsappButton: "Hablar por WhatsApp",
           whatsappMessageEnd: "Me gustaría obtener más información.",
           whatsappMessageTemplate: "Hola! Me interesa la campaña: {campaign}. Mi nombre es {name} (Código: {code}). {ending}",
+          whatsappMessageTemplateNoCode: "Hola! Me interesa la campaña: {campaign}. Mi nombre es {name}. {ending}",
         },
         application: {
           title: "Aplicar a:",
@@ -604,6 +605,16 @@ export const TEXTS = {
             cancel: "Cancelar",
           },
         },
+      },
+      defaults: {
+        courierName: "Mensajero",
+        campaignTitle: "Campaña",
+        noDescription: "Sin descripción",
+        noCity: "—",
+        noCompensation: "—",
+        allVehicles: "Todos",
+        allSchedules: "Todos",
+        allWorkdays: "Todas",
       },
       actions: {
         myApplications: "Mis Postulaciones",
@@ -673,6 +684,7 @@ export const TEXTS = {
     applications: {
       header: {
         title: "Mis Postulaciones",
+        codeLabel: "Código:",
         logout: "Cerrar sesión",
       },
       main: {
@@ -708,6 +720,10 @@ export const TEXTS = {
         review: "⏳ Tu postulación está siendo revisada. Te contactaremos pronto.",
         accepted: "✅ ¡Felicidades! Has sido aceptado para esta campaña. Nos pondremos en contacto contigo.",
         rejected: "❌ Lo sentimos, en esta ocasión no has sido seleccionado. Sigue explorando otras campañas.",
+      },
+      defaults: {
+        courierName: "Mensajero",
+        campaignTitle: "Campaña",
       },
     },
   },

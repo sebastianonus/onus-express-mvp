@@ -156,10 +156,15 @@ export function MensajerosSesion() {
         return;
       }
       ensureMensajeroSessionWindow(session);
+      const codigo = String(session.user.user_metadata?.codigo ?? '').trim();
 
       setMensajero({
-        codigo: String(session.user.user_metadata?.codigo ?? '—'),
-        nombre: String(session.user.user_metadata?.nombre ?? session.user.email ?? 'Mensajero'),
+        codigo,
+        nombre: String(
+          session.user.user_metadata?.nombre ??
+            session.user.email ??
+            TEXTS.couriers.session.defaults.courierName
+        ),
         email: session.user.email ?? '',
         telefono: String(session.user.user_metadata?.telefono ?? ''),
         activo: true,
@@ -191,21 +196,28 @@ export function MensajerosSesion() {
       } else {
         const mapped: Campana[] = (campanasData ?? []).map((c: any) => ({
           id: c.id,
-          nombre: c.nombre ?? c.titulo ?? c.title ?? 'Campaña',
+          nombre:
+            c.nombre ??
+            c.titulo ??
+            c.title ??
+            TEXTS.couriers.session.defaults.campaignTitle,
           logoUrl:
             typeof (c.logo_url ?? c.logo ?? c.logoUrl) === 'string' &&
             String(c.logo_url ?? c.logo ?? c.logoUrl).trim() !== ''
               ? String(c.logo_url ?? c.logo ?? c.logoUrl).trim()
               : undefined,
-          descripcion: c.descripcion ?? c.description ?? 'Sin descripción',
-          ciudad: c.ciudad ?? c.city ?? '—',
+          descripcion:
+            c.descripcion ??
+            c.description ??
+            TEXTS.couriers.session.defaults.noDescription,
+          ciudad: c.ciudad ?? c.city ?? TEXTS.couriers.session.defaults.noCity,
           vehiculo: Array.isArray(c.vehiculos ?? c.vehicles) && (c.vehiculos ?? c.vehicles).length === 1
             ? (c.vehiculos ?? c.vehicles)[0]
-            : (c.vehiculo ?? 'Todos'),
+            : (c.vehiculo ?? TEXTS.couriers.session.defaults.allVehicles),
           vehiculos: Array.isArray(c.vehiculos ?? c.vehicles) ? (c.vehiculos ?? c.vehicles) : [],
-          horario: c.horario ?? 'Todos',
-          jornada: c.jornada ?? 'Todas',
-          pago: c.pago ?? c.tarifa ?? c.rate ?? '—',
+          horario: c.horario ?? TEXTS.couriers.session.defaults.allSchedules,
+          jornada: c.jornada ?? TEXTS.couriers.session.defaults.allWorkdays,
+          pago: c.pago ?? c.tarifa ?? c.rate ?? TEXTS.couriers.session.defaults.noCompensation,
           requisitos: Array.isArray(c.requisitos ?? c.requirements)
             ? (c.requisitos ?? c.requirements)
                 .map((r: string) => String(r))
@@ -334,10 +346,12 @@ export function MensajerosSesion() {
               >
                 {TEXTS.couriers.session.header.hello} {mensajero.nombre}
               </h1>
-              <p className="text-gray-300">
-                {TEXTS.couriers.session.header.codeLabel}{' '}
-                <span className="font-mono text-[#00C9CE]">{mensajero.codigo}</span>
-              </p>
+              {mensajero.codigo && (
+                <p className="text-gray-300">
+                  {TEXTS.couriers.session.header.codeLabel}{' '}
+                  <span className="font-mono text-[#00C9CE]">{mensajero.codigo}</span>
+                </p>
+              )}
             </div>
             <div className="flex flex-col sm:flex-row gap-3">
               <Link to="/mensajeros/postulaciones">
@@ -746,7 +760,10 @@ export function MensajerosSesion() {
                 <div className="flex gap-3">
                   <Button
                     onClick={() => {
-                      const mensaje = TEXTS.couriers.session.modals.details.whatsappMessageTemplate
+                      const template = mensajero.codigo
+                        ? TEXTS.couriers.session.modals.details.whatsappMessageTemplate
+                        : TEXTS.couriers.session.modals.details.whatsappMessageTemplateNoCode;
+                      const mensaje = template
                         .replace('{campaign}', selectedCampaign.nombre)
                         .replace('{name}', mensajero.nombre)
                         .replace('{code}', mensajero.codigo)
@@ -916,10 +933,12 @@ export function MensajerosSesion() {
                       <strong>{TEXTS.couriers.session.modals.application.profileSection.phone}</strong>{' '}
                       {mensajero.telefono}
                     </p>
-                    <p className="text-gray-700">
-                      <strong>{TEXTS.couriers.session.modals.application.profileSection.code}</strong>{' '}
-                      {mensajero.codigo}
-                    </p>
+                    {mensajero.codigo && (
+                      <p className="text-gray-700">
+                        <strong>{TEXTS.couriers.session.modals.application.profileSection.code}</strong>{' '}
+                        {mensajero.codigo}
+                      </p>
+                    )}
                   </div>
                 </div>
 
