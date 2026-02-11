@@ -49,29 +49,29 @@ export function Contacto() {
         telefono: formData.telefono.trim(),
         email: formData.email.trim(),
       };
-      const payloadFull = {
+      const enrichedMessage = [
+        formData.empresa.trim() ? `Empresa: ${formData.empresa.trim()}` : '',
+        `Contexto: ${getContextualText()}`,
+        '',
+        formData.mensaje.trim(),
+      ]
+        .filter(Boolean)
+        .join('\n');
+
+      const payloadMain = {
         ...basePayload,
-        empresa: formData.empresa.trim() || null,
-        mensaje: formData.mensaje.trim(),
-      };
-      const payloadNoEmpresa = {
-        ...basePayload,
-        mensaje: formData.mensaje.trim(),
+        mensaje: enrichedMessage,
       };
       const payloadMin = {
         ...basePayload,
       };
 
       let insertError: unknown = null;
-      const first = await supabase.from('contactos').insert(payloadFull);
+      const first = await supabase.from('contactos').insert(payloadMain);
       insertError = first.error;
       if (insertError) {
-        const second = await supabase.from('contactos').insert(payloadNoEmpresa);
+        const second = await supabase.from('contactos').insert(payloadMin);
         insertError = second.error;
-      }
-      if (insertError) {
-        const third = await supabase.from('contactos').insert(payloadMin);
-        insertError = third.error;
       }
       if (insertError) {
         throw insertError;
