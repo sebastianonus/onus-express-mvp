@@ -165,16 +165,47 @@ export function CampanaDetalleView({ campaignId, onBack }: CampanaDetalleViewPro
         return;
       }
 
+      const userIds = Array.from(
+        new Set((postsRows ?? []).map((row: any) => String(row.user_id ?? '')).filter(Boolean))
+      );
+
+      const profileById = new Map<string, { nombre?: string; email?: string; telefono?: string }>();
+      if (userIds.length > 0) {
+        const { data: profilesRows, error: profilesErr } = await supabase
+          .from('users')
+          .select('id, nombre, email, telefono')
+          .in('id', userIds);
+
+        if (profilesErr) {
+          console.warn('No se pudieron cargar perfiles desde users:', profilesErr);
+        } else {
+          for (const profile of profilesRows ?? []) {
+            const id = String((profile as any).id ?? '');
+            if (!id) continue;
+            profileById.set(id, {
+              nombre: String((profile as any).nombre ?? '').trim() || undefined,
+              email: String((profile as any).email ?? '').trim() || undefined,
+              telefono: String((profile as any).telefono ?? '').trim() || undefined,
+            });
+          }
+        }
+      }
+
       const mapped: Postulacion[] = (postsRows ?? []).map((row: any) => {
         const parsed = parseMensaje(row.mensaje);
         const userId = String(row.user_id ?? '');
+        const profile = profileById.get(userId);
         return {
           id: String(row.id),
           user_id: userId,
           campaign_id: String(row.campaign_id ?? campaignId),
-          mensajeroNombre: userId || TEXTS.admin.campanaDetalle.defaults.courierName,
-          mensajeroEmail: '',
-          mensajeroTelefono: '',
+          mensajeroNombre:
+            profile?.nombre ||
+            profile?.email ||
+            userId ||
+            TEXTS.admin.campanaDetalle.defaults.courierName,
+          mensajeroEmail: profile?.email ?? '',
+          mensajeroTelefono: profile?.telefono ?? '',
           fecha: String(row.created_at ?? new Date().toISOString()),
           estado: dbEstadoToUi(row.estado),
           motivacion: parsed.motivacion,
@@ -206,7 +237,13 @@ export function CampanaDetalleView({ campaignId, onBack }: CampanaDetalleViewPro
       message += TEXTS.admin.campanaDetalle.whatsapp.rejectedMessage.replace('{campaignTitle}', campaign?.titulo || '');
     }
 
-    const whatsappUrl = `https://wa.me/34${postulacion.mensajeroTelefono.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(message)}`;
+    let phoneDigits = postulacion.mensajeroTelefono.replace(/[^0-9]/g, '');
+    if (phoneDigits.startsWith('00')) {
+      phoneDigits = phoneDigits.slice(2);
+    }
+    const whatsappNumber =
+      phoneDigits.startsWith('34') || phoneDigits.length !== 9 ? phoneDigits : `34${phoneDigits}`;
+    const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
     window.open(whatsappUrl, '_blank');
   };
 
