@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { createClient } from '@supabase/supabase-js';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import {
@@ -17,12 +16,7 @@ import { TEXTS } from '@/content/texts';
 import { useRequireRole } from '../hooks/useRequireRole';
 import { toast } from 'sonner';
 import { clearMensajeroSessionWindow, ensureMensajeroSessionWindow, isMensajeroSessionExpired } from '../utils/mensajerosSession';
-
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
-
-const supabase =
-  supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
+import { supabase } from '../supabase';
 
 interface MensajeroAuth {
   codigo: string;
