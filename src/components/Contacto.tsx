@@ -44,16 +44,35 @@ export function Contacto() {
     setError('');
 
     try {
-      const payload = {
+      const basePayload = {
         nombre: formData.nombre.trim(),
-        empresa: formData.empresa.trim() || null,
         telefono: formData.telefono.trim(),
         email: formData.email.trim(),
+      };
+      const payloadFull = {
+        ...basePayload,
+        empresa: formData.empresa.trim() || null,
         mensaje: formData.mensaje.trim(),
       };
+      const payloadNoEmpresa = {
+        ...basePayload,
+        mensaje: formData.mensaje.trim(),
+      };
+      const payloadMin = {
+        ...basePayload,
+      };
 
-      const { error: insertError } = await supabase.from('contactos').insert(payload);
-
+      let insertError: unknown = null;
+      const first = await supabase.from('contactos').insert(payloadFull);
+      insertError = first.error;
+      if (insertError) {
+        const second = await supabase.from('contactos').insert(payloadNoEmpresa);
+        insertError = second.error;
+      }
+      if (insertError) {
+        const third = await supabase.from('contactos').insert(payloadMin);
+        insertError = third.error;
+      }
       if (insertError) {
         throw insertError;
       }
