@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Package, Zap, Warehouse, CheckCircle2, Lock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { createClient } from '@supabase/supabase-js';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Button } from './ui/button';
@@ -10,12 +9,7 @@ import { TarifarioMensajeriaExpress } from './tarifarios/TarifarioMensajeriaExpr
 import { TarifarioAlmacenLogistica } from './tarifarios/TarifarioAlmacenLogistica';
 import backgroundImage from 'figma:asset/433f006a1a8dbb744643830e0e0b3f07184d05b1.png';
 import { TEXTS } from '@/content/texts';
-
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
-
-const supabase =
-  supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
+import { supabase } from '@/supabase';
 
 export function Clientes() {
   const navigate = useNavigate();
@@ -35,11 +29,6 @@ export function Clientes() {
 
     if (!email.trim() || !password.trim()) {
       setError(TEXTS.clients.errors.emptyCode);
-      return;
-    }
-
-    if (!supabase) {
-      setError(TEXTS.clients.errors.invalidCode);
       return;
     }
 
