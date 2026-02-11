@@ -17,6 +17,7 @@ import { useRequireRole } from '../hooks/useRequireRole';
 import { supabase } from '../supabase';
 import {
   clearAdminSession,
+  setAdminPin,
   isAdminSessionActive,
   setAdminSession,
 } from '../utils/adminAuth';
@@ -380,6 +381,7 @@ export function AdminPanel() {
       }
 
       setAdminSession();
+      setAdminPin(pin.trim());
       setIsAuthenticated(true);
       setPin('');
     } catch {

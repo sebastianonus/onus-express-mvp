@@ -5,6 +5,7 @@ import { Badge } from '../ui/badge';
 import { toast } from 'sonner';
 import { TEXTS } from '@/content/texts';
 import { supabase } from '../../supabase';
+import { getAdminPin } from '../../utils/adminAuth';
 
 interface Postulacion {
   id: string;
@@ -174,13 +175,41 @@ export function CampanaDetalleView({ campaignId, onBack }: CampanaDetalleViewPro
   ) => {
     setUpdatingId(postulacionId);
     const dbStatus = uiEstadoToDb(nuevoEstado);
+    const pin = getAdminPin();
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 
-    const { error } = await supabase
-      .from('postulaciones')
-      .update({ estado: dbStatus })
-      .eq('id', postulacionId);
+    if (!pin || !supabaseUrl || !anonKey) {
+      toast.error(TEXTS.admin.campanaDetalle.toasts.updateError);
+      setUpdatingId(null);
+      return;
+    }
 
-    if (error) {
+    try {
+      const res = await fetch(
+        `${supabaseUrl}/functions/v1/server/make-server-372a0974/admin/update-postulacion-status`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            apikey: anonKey,
+            Authorization: `Bearer ${anonKey}`,
+          },
+          body: JSON.stringify({
+            pin,
+            postulacionId,
+            estado: dbStatus,
+          }),
+        }
+      );
+      const json = await res.json();
+      if (!res.ok || json?.error) {
+        console.error('Error updating postulacion estado:', json);
+        toast.error(json?.error ?? TEXTS.admin.campanaDetalle.toasts.updateError);
+        setUpdatingId(null);
+        return;
+      }
+    } catch (error) {
       console.error('Error updating postulacion estado:', error);
       toast.error(TEXTS.admin.campanaDetalle.toasts.updateError);
       setUpdatingId(null);

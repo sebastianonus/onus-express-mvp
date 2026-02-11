@@ -1047,4 +1047,42 @@ app.post("/make-server-372a0974/admin/create-user", async (c) => {
   }
 });
 
+app.post("/make-server-372a0974/admin/update-postulacion-status", async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const pin = body?.pin as string | undefined;
+    const postulacionId = String(body?.postulacionId ?? "").trim();
+    const estado = String(body?.estado ?? "").trim().toLowerCase();
+
+    if (!isAdminPinValid(pin)) {
+      return c.json({ error: "PIN inválido" }, 401);
+    }
+    if (!postulacionId) {
+      return c.json({ error: "postulacionId requerido" }, 400);
+    }
+    if (!["pending", "accepted", "rejected"].includes(estado)) {
+      return c.json({ error: "Estado inválido" }, 400);
+    }
+
+    const { data, error } = await supabase
+      .from("postulaciones")
+      .update({ estado })
+      .eq("id", postulacionId)
+      .select("id, estado")
+      .maybeSingle();
+
+    if (error) {
+      return c.json({ error: error.message }, 500);
+    }
+    if (!data) {
+      return c.json({ error: "Postulación no encontrada o sin permisos" }, 404);
+    }
+
+    return c.json({ success: true, postulacion: data });
+  } catch (error) {
+    console.error("Error actualizando estado de postulación:", error);
+    return c.json({ error: "Error actualizando estado de postulación" }, 500);
+  }
+});
+
 Deno.serve(app.fetch);
