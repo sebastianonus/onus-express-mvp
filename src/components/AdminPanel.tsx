@@ -17,7 +17,6 @@ import { useRequireRole } from '../hooks/useRequireRole';
 import { supabase } from '../supabase';
 import {
   clearAdminSession,
-  setAdminPin,
   isAdminSessionActive,
   setAdminSession,
 } from '../utils/adminAuth';
@@ -82,6 +81,7 @@ interface PendingProfile {
   email: string;
   telefono: string;
   ciudad: string;
+  origen_formulario?: string;
   created_at: string | null;
   procesado: boolean;
 }
@@ -152,6 +152,8 @@ export function AdminPanel() {
   const [pendingProfiles, setPendingProfiles] = useState<PendingProfile[]>([]);
   const [loadingProfiles, setLoadingProfiles] = useState(false);
   const [creatingUserKey, setCreatingUserKey] = useState<string | null>(null);
+  const [showPendingProfilesList, setShowPendingProfilesList] = useState(true);
+  const [pendingProfilesLimit, setPendingProfilesLimit] = useState('25');
 
   // Estados para filtros de búsqueda
   const [searchCliente, setSearchCliente] = useState('all');
@@ -278,7 +280,10 @@ export function AdminPanel() {
   ];
   const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 
-  const callAdminFunction = async (path: 'pending-profiles' | 'create-user', body: Record<string, unknown>) => {
+  const callAdminFunction = async (
+    path: 'pending-profiles' | 'create-user' | 'get-client-password' | 'reset-client-password',
+    body: Record<string, unknown>,
+  ) => {
     if (!supabaseUrl) {
       return { ok: false, json: { error: TEXTS.admin.panel.profiles.errors.missingConfig } };
     }
@@ -365,19 +370,87 @@ export function AdminPanel() {
         role,
         source: profile.source,
         sourceId: profile.id,
+        origen_formulario: profile.origen_formulario ?? profile.source,
       });
       if (!ok || json?.error) {
         toast.error(json?.error ?? TEXTS.admin.panel.profiles.errors.create);
         return;
       }
 
-      toast.success(`${TEXTS.admin.panel.profiles.success.userCreatedPrefix} ${profile.email}`);
+      const generatedPassword = typeof json?.generatedPassword === 'string' ? json.generatedPassword : '';
+      if (role === 'cliente' && generatedPassword) {
+        toast.success(`${TEXTS.admin.panel.profiles.success.userCreatedWithPasswordPrefix} ${profile.email} | ${TEXTS.admin.panel.profiles.success.passwordLabel} ${generatedPassword}`);
+      } else {
+        toast.success(`${TEXTS.admin.panel.profiles.success.userCreatedPrefix} ${profile.email}`);
+      }
       await fetchPendingProfiles();
     } catch (err) {
       console.error('Error creando usuario:', err);
       toast.error(TEXTS.admin.panel.profiles.errors.createGeneric);
     } finally {
       setCreatingUserKey(null);
+    }
+  };
+
+  const viewClientPassword = async (profile: PendingProfile) => {
+    if (!adminOpsPin.trim()) {
+      toast.error(TEXTS.admin.panel.profiles.errors.missingPinCreate);
+      return;
+    }
+    if (!anonKey) {
+      toast.error(TEXTS.admin.panel.profiles.errors.missingConfig);
+      return;
+    }
+
+    try {
+      const { ok, json } = await callAdminFunction('get-client-password', {
+        pin: adminOpsPin.trim(),
+        email: profile.email,
+      });
+      if (!ok || json?.error) {
+        toast.error(json?.error ?? TEXTS.admin.panel.profiles.errors.getClientPassword);
+        return;
+      }
+      const pwd = String(json?.credential?.password_visible ?? '');
+      if (!pwd) {
+        toast.error(TEXTS.admin.panel.profiles.errors.getClientPassword);
+        return;
+      }
+      toast.success(`${TEXTS.admin.panel.profiles.success.passwordLabel} ${pwd}`);
+    } catch (err) {
+      console.error('Error consultando clave cliente:', err);
+      toast.error(TEXTS.admin.panel.profiles.errors.getClientPasswordGeneric);
+    }
+  };
+
+  const resetClientPassword = async (profile: PendingProfile) => {
+    if (!adminOpsPin.trim()) {
+      toast.error(TEXTS.admin.panel.profiles.errors.missingPinCreate);
+      return;
+    }
+    if (!anonKey) {
+      toast.error(TEXTS.admin.panel.profiles.errors.missingConfig);
+      return;
+    }
+
+    try {
+      const { ok, json } = await callAdminFunction('reset-client-password', {
+        pin: adminOpsPin.trim(),
+        email: profile.email,
+      });
+      if (!ok || json?.error) {
+        toast.error(json?.error ?? TEXTS.admin.panel.profiles.errors.resetClientPassword);
+        return;
+      }
+      const pwd = String(json?.generatedPassword ?? '');
+      if (!pwd) {
+        toast.error(TEXTS.admin.panel.profiles.errors.resetClientPassword);
+        return;
+      }
+      toast.success(`${TEXTS.admin.panel.profiles.success.passwordResetPrefix} ${pwd}`);
+    } catch (err) {
+      console.error('Error reseteando clave cliente:', err);
+      toast.error(TEXTS.admin.panel.profiles.errors.resetClientPasswordGeneric);
     }
   };
 
@@ -408,7 +481,6 @@ export function AdminPanel() {
       }
 
       setAdminSession();
-      setAdminPin(pin.trim());
       setIsAuthenticated(true);
       setPin('');
     } catch {
@@ -912,41 +984,110 @@ export function AdminPanel() {
               {pendingProfiles.length === 0 ? (
                 <p className="text-sm text-gray-500">{TEXTS.admin.panel.profiles.empty}</p>
               ) : (
-                <div className="space-y-3">
-                  {pendingProfiles.map((profile) => (
-                    <div key={`${profile.source}:${profile.id}`} className="border border-gray-200 rounded-lg p-4">
-                      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                        <div className="text-sm">
-                          <p className="text-[#000935] font-medium">{profile.nombre || '-'}</p>
-                          <p className="text-gray-600">{profile.email || '-'}</p>
-                          <p className="text-gray-500">{profile.telefono || '-'}</p>
-                          <p className="text-xs text-gray-400">
-                            {profile.source} {TEXTS.admin.panel.profiles.sourceSeparator} {profile.created_at ? new Date(profile.created_at).toLocaleString('es-ES') : '-'}
-                          </p>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            className="bg-[#00C9CE] hover:bg-[#00B5BA] text-[#000935]"
-                            disabled={creatingUserKey === `${profile.source}:${profile.id}:mensajero`}
-                            onClick={() => createUserFromProfile(profile, 'mensajero')}
-                          >
-                            {TEXTS.admin.panel.profiles.actions.createCourier}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="border-[#000935] text-[#000935]"
-                            disabled={creatingUserKey === `${profile.source}:${profile.id}:cliente`}
-                            onClick={() => createUserFromProfile(profile, 'cliente')}
-                          >
-                            {TEXTS.admin.panel.profiles.actions.createClient}
-                          </Button>
-                        </div>
-                      </div>
+                <>
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-3">
+                    <div className="flex items-center gap-2">
+                      <Label className="text-sm text-gray-600">
+                        {TEXTS.admin.panel.profiles.controls.amountLabel}
+                      </Label>
+                      <Select value={pendingProfilesLimit} onValueChange={setPendingProfilesLimit}>
+                        <SelectTrigger className="w-[120px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="10">10</SelectItem>
+                          <SelectItem value="25">25</SelectItem>
+                          <SelectItem value="50">50</SelectItem>
+                          <SelectItem value="100">100</SelectItem>
+                          <SelectItem value="all">{TEXTS.admin.panel.profiles.controls.optionAll}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <span className="text-xs text-gray-500">
+                        {TEXTS.admin.panel.profiles.controls.showingPrefix}{' '}
+                        {pendingProfilesLimit === 'all' ? pendingProfiles.length : Math.min(pendingProfiles.length, Number(pendingProfilesLimit))}{' '}
+                        {TEXTS.admin.panel.profiles.controls.showingMiddle}{' '}
+                        {pendingProfiles.length}{' '}
+                        {TEXTS.admin.panel.profiles.controls.showingSuffix}
+                      </span>
                     </div>
-                  ))}
-                </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-full md:w-auto border-[#00C9CE] text-[#00C9CE] hover:bg-[#00C9CE]/10"
+                      onClick={() => setShowPendingProfilesList((prev) => !prev)}
+                    >
+                      {showPendingProfilesList
+                        ? TEXTS.admin.panel.profiles.controls.hideList
+                        : TEXTS.admin.panel.profiles.controls.showList}
+                    </Button>
+                  </div>
+
+                  {showPendingProfilesList ? (
+                    <div className="space-y-3 max-h-[440px] overflow-y-auto pr-1">
+                      {(pendingProfilesLimit === 'all'
+                        ? pendingProfiles
+                        : pendingProfiles.slice(0, Number(pendingProfilesLimit))
+                      ).map((profile) => (
+                        <div key={`${profile.source}:${profile.id}`} className="border border-gray-200 rounded-lg p-4">
+                          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                            <div className="text-sm">
+                              <p className="text-[#000935] font-medium">{profile.nombre || '-'}</p>
+                              <p className="text-gray-600">{profile.email || '-'}</p>
+                              <p className="text-gray-500">{profile.telefono || '-'}</p>
+                              <p className="text-xs text-gray-400">
+                                {profile.source} {TEXTS.admin.panel.profiles.sourceSeparator} {profile.created_at ? new Date(profile.created_at).toLocaleString('es-ES') : '-'}
+                              </p>
+                              <p className="text-xs text-gray-400">
+                                {TEXTS.admin.panel.profiles.originLabel} {profile.origen_formulario || '-'}
+                              </p>
+                            </div>
+                            <div className="flex gap-2">
+                              {profile.source === 'solicitudes_mensajeros' ? (
+                                <Button
+                                  size="sm"
+                                  className="bg-[#00C9CE] hover:bg-[#00B5BA] text-[#000935]"
+                                  disabled={creatingUserKey === `${profile.source}:${profile.id}:mensajero`}
+                                  onClick={() => createUserFromProfile(profile, 'mensajero')}
+                                >
+                                  {TEXTS.admin.panel.profiles.actions.createCourier}
+                                </Button>
+                              ) : null}
+                              {profile.source === 'contactos' ? (
+                                <>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="border-[#000935] text-[#000935]"
+                                    disabled={creatingUserKey === `${profile.source}:${profile.id}:cliente`}
+                                    onClick={() => createUserFromProfile(profile, 'cliente')}
+                                  >
+                                    {TEXTS.admin.panel.profiles.actions.createClient}
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="border-[#00C9CE] text-[#00C9CE]"
+                                    onClick={() => viewClientPassword(profile)}
+                                  >
+                                    {TEXTS.admin.panel.profiles.actions.viewClientPassword}
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="border-amber-500 text-amber-600"
+                                    onClick={() => resetClientPassword(profile)}
+                                  >
+                                    {TEXTS.admin.panel.profiles.actions.resetClientPassword}
+                                  </Button>
+                                </>
+                              ) : null}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </>
               )}
             </div>
 

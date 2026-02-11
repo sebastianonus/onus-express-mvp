@@ -56,8 +56,15 @@ export function Contacto() {
       ]
         .filter(Boolean)
         .join('\n');
+      const origenFormulario =
+        service === 'fleet'
+          ? 'servicios_solicitar_flota'
+          : service === 'logistics_staff'
+            ? 'servicios_personal_logistico'
+            : 'contacto_general';
 
       const variants: Record<string, unknown>[] = [
+        { nombre, telefono, email, mensaje: enrichedMessage, origen_formulario: origenFormulario },
         { nombre, telefono, email, mensaje: enrichedMessage },
         { name: nombre, phone: telefono, email, message: enrichedMessage },
         { full_name: nombre, phone: telefono, email, message: enrichedMessage },

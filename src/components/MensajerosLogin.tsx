@@ -132,6 +132,7 @@ export function MensajerosLogin() {
         nombre: formData.nombre.trim(),
         telefono: formData.telefono.trim(),
         ciudad: formData.ciudad,
+        origen_formulario: 'mensajeros_registro',
         experiencia: `Vehículo: ${formData.vehiculo}\nFlotista: ${formData.flotista}`,
       };
 
@@ -154,6 +155,7 @@ export function MensajerosLogin() {
           email: payload.email,
           telefono: payload.telefono,
           ciudad: payload.ciudad,
+          origen_formulario: 'mensajeros_registro',
         });
         insertError = third.error;
       }
