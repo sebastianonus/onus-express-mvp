@@ -1238,6 +1238,7 @@ export const TEXTS = {
         reject: "Rechazar",
         notifyWhatsApp: "Notificar por WhatsApp",
         statusLabel: "Estado:",
+        statusReadOnlyInfo: "Estado gestionado desde Supabase (solo lectura en panel)",
         setInReview: "En revisión",
         setAccepted: "Aceptado",
         setRejected: "Rechazado",

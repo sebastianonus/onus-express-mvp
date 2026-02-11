@@ -1,21 +1,20 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { ArrowLeft, CheckCircle2, XCircle, User, Mail, Phone, Calendar, MessageSquare, AlertCircle, Download, MapPin, DollarSign, Building2 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { toast } from 'sonner';
 import { TEXTS } from '@/content/texts';
 import { supabase } from '../../supabase';
-import { getAdminPin } from '../../utils/adminAuth';
 
 interface Postulacion {
   id: string;
   user_id: string; // Cambiado de mensajeroCodigo - referencia a auth.users
   campaign_id: string; // Cambiado de campanaId
-  mensajeroNombre: string; // Temporal - en producciÃ³n vendrÃ¡ de JOIN con auth.users
-  mensajeroEmail: string; // Temporal - en producciÃ³n vendrÃ¡ de JOIN con auth.users
-  mensajeroTelefono: string; // Temporal - en producciÃ³n vendrÃ¡ de JOIN con auth.users
+  mensajeroNombre: string; // Temporal - en producciÃƒÂ³n vendrÃƒÂ¡ de JOIN con auth.users
+  mensajeroEmail: string; // Temporal - en producciÃƒÂ³n vendrÃƒÂ¡ de JOIN con auth.users
+  mensajeroTelefono: string; // Temporal - en producciÃƒÂ³n vendrÃƒÂ¡ de JOIN con auth.users
   fecha: string;
-  estado: 'En revisiÃ³n' | 'Aceptado' | 'Rechazado';
+  estado: 'En revisiÃƒÂ³n' | 'Aceptado' | 'Rechazado';
   motivacion?: string;
   experiencia?: string;
   disponibilidad?: string;
@@ -44,16 +43,15 @@ interface CampanaDetalleViewProps {
 export function CampanaDetalleView({ campaignId, onBack }: CampanaDetalleViewProps) {
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [postulaciones, setPostulaciones] = useState<Postulacion[]>([]);
-  const [filter, setFilter] = useState<'all' | 'En revisiÃ³n' | 'Aceptado' | 'Rechazado'>('all');
+  const [filter, setFilter] = useState<'all' | 'En revisiÃƒÂ³n' | 'Aceptado' | 'Rechazado'>('all');
   const [loading, setLoading] = useState(true);
-  const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   const dbEstadoToUi = (estado: string | null | undefined): Postulacion['estado'] => {
-    if (!estado) return 'En revisión';
+    if (!estado) return 'En revisiÃ³n';
     const normalized = estado.toLowerCase();
     if (normalized === 'accepted' || normalized === 'aceptado') return 'Aceptado';
     if (normalized === 'rejected' || normalized === 'rechazado') return 'Rechazado';
-    return 'En revisión';
+    return 'En revisiÃ³n';
   };
 
   const uiEstadoToDb = (estado: Postulacion['estado']): 'pending' | 'accepted' | 'rejected' => {
@@ -82,6 +80,28 @@ export function CampanaDetalleView({ campaignId, onBack }: CampanaDetalleViewPro
 
   useEffect(() => {
     loadData();
+  }, [campaignId]);
+
+  useEffect(() => {
+    const channel = supabase
+      .channel(`admin-campana-postulaciones-${campaignId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'postulaciones',
+          filter: `campaign_id=eq.${campaignId}`,
+        },
+        () => {
+          void loadData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
   }, [campaignId]);
 
   const loadData = async () => {
@@ -169,87 +189,6 @@ export function CampanaDetalleView({ campaignId, onBack }: CampanaDetalleViewPro
     }
   };
 
-  const handleUpdateEstado = async (
-    postulacionId: string,
-    nuevoEstado: Postulacion['estado']
-  ) => {
-    setUpdatingId(postulacionId);
-    const dbStatus = uiEstadoToDb(nuevoEstado);
-    const pin = getAdminPin();
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
-
-    if (!pin || !supabaseUrl || !anonKey) {
-      toast.error(TEXTS.admin.campanaDetalle.toasts.updateError);
-      setUpdatingId(null);
-      return;
-    }
-
-    try {
-      const endpointCandidates = [
-        `${supabaseUrl}/functions/v1/server/make-server-372a0974/admin/update-postulacion-status`,
-        `${supabaseUrl}/functions/v1/server/admin/update-postulacion-status`,
-      ];
-
-      let lastErrorMessage = '';
-      let updatedOk = false;
-
-      for (const endpoint of endpointCandidates) {
-        const res = await fetch(endpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            apikey: anonKey,
-            Authorization: `Bearer ${anonKey}`,
-          },
-          body: JSON.stringify({
-            pin,
-            postulacionId,
-            estado: dbStatus,
-          }),
-        });
-
-        const raw = await res.text();
-        let json: any = null;
-        try {
-          json = raw ? JSON.parse(raw) : null;
-        } catch {
-          json = null;
-        }
-
-        if (res.ok && !json?.error) {
-          updatedOk = true;
-          break;
-        }
-
-        if (res.status === 404) {
-          lastErrorMessage = `Ruta no encontrada en función server: ${endpoint}`;
-          continue;
-        }
-
-        lastErrorMessage = json?.error ?? raw ?? `HTTP ${res.status}`;
-      }
-
-      if (!updatedOk) {
-        console.error('Error updating postulacion estado:', lastErrorMessage);
-        toast.error(lastErrorMessage || TEXTS.admin.campanaDetalle.toasts.updateError);
-        setUpdatingId(null);
-        return;
-      }
-    } catch (error) {
-      console.error('Error updating postulacion estado:', error);
-      toast.error(TEXTS.admin.campanaDetalle.toasts.updateError);
-      setUpdatingId(null);
-      return;
-    }
-
-    setPostulaciones((prev) =>
-      prev.map((p) => (p.id === postulacionId ? { ...p, estado: nuevoEstado } : p))
-    );
-    toast.success(TEXTS.admin.campanaDetalle.toasts.updateSuccess);
-    setUpdatingId(null);
-  };
-
   const handleWhatsApp = (postulacion: Postulacion) => {
     if (!postulacion.mensajeroTelefono) {
       toast.error(TEXTS.admin.campanaDetalle.toasts.missingPhone);
@@ -314,7 +253,7 @@ export function CampanaDetalleView({ campaignId, onBack }: CampanaDetalleViewPro
       const csvDataLines = rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(';'));
       const csvContent = [csvHeaderLine, ...csvDataLines].join('\n');
 
-      // AÃ±adir BOM para que Excel reconozca UTF-8
+      // AÃƒÂ±adir BOM para que Excel reconozca UTF-8
       const BOM = '\uFEFF';
       const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
       
@@ -323,7 +262,7 @@ export function CampanaDetalleView({ campaignId, onBack }: CampanaDetalleViewPro
       const link = document.createElement('a');
       link.href = url;
       
-      // Nombre de archivo con fecha y nombre de campaÃ±a
+      // Nombre de archivo con fecha y nombre de campaÃƒÂ±a
       const fecha = new Date().toISOString().split('T')[0];
       const campanaNombre = campaign?.titulo.replace(/[^a-zA-Z0-9]/g, '_') || 'Campana';
       link.download = `ONUS_Postulaciones_${campanaNombre}_${fecha}.csv`;
@@ -372,7 +311,7 @@ export function CampanaDetalleView({ campaignId, onBack }: CampanaDetalleViewPro
 
   const stats = {
     total: postulaciones.length,
-    enRevision: postulaciones.filter(p => p.estado === 'En revisiÃ³n').length,
+    enRevision: postulaciones.filter(p => p.estado === 'En revisiÃƒÂ³n').length,
     aceptados: postulaciones.filter(p => p.estado === 'Aceptado').length,
     rechazados: postulaciones.filter(p => p.estado === 'Rechazado').length
   };
@@ -444,7 +383,7 @@ export function CampanaDetalleView({ campaignId, onBack }: CampanaDetalleViewPro
         </div>
       </div>
 
-      {/* EstadÃ­sticas */}
+      {/* EstadÃƒÂ­sticas */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white rounded-xl p-6 border-2 border-gray-200 text-center">
           <p className="text-3xl mb-2" style={{ color: '#000935', fontWeight: 600 }}>
@@ -489,10 +428,10 @@ export function CampanaDetalleView({ campaignId, onBack }: CampanaDetalleViewPro
                 {TEXTS.admin.campanaDetalle.filters.all} ({stats.total})
               </Button>
               <Button
-                onClick={() => setFilter('En revisiÃ³n')}
+                onClick={() => setFilter('En revisiÃƒÂ³n')}
                 size="sm"
-                variant={filter === 'En revisiÃ³n' ? 'default' : 'outline'}
-                className={filter === 'En revisiÃ³n' 
+                variant={filter === 'En revisiÃƒÂ³n' ? 'default' : 'outline'}
+                className={filter === 'En revisiÃƒÂ³n' 
                   ? 'bg-yellow-500 text-white hover:bg-yellow-600' 
                   : 'text-gray-700 border-gray-300'}
               >
@@ -571,7 +510,7 @@ export function CampanaDetalleView({ campaignId, onBack }: CampanaDetalleViewPro
                 {getEstadoBadge(postulacion.estado)}
               </div>
 
-              {/* InformaciÃ³n de contacto */}
+              {/* InformaciÃƒÂ³n de contacto */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 p-4 bg-gray-50 rounded-lg">
                 <div className="flex items-center gap-2 text-sm">
                   <Phone className="w-4 h-4" style={{ color: '#00C9CE' }} />
@@ -593,7 +532,7 @@ export function CampanaDetalleView({ campaignId, onBack }: CampanaDetalleViewPro
                 </div>
               </div>
 
-              {/* Detalles de la postulaciÃ³n */}
+              {/* Detalles de la postulaciÃƒÂ³n */}
               <div className="space-y-3 mb-4">
                 {postulacion.motivacion && (
                   <div>
@@ -631,45 +570,7 @@ export function CampanaDetalleView({ campaignId, onBack }: CampanaDetalleViewPro
               <div className="pt-4 border-t border-gray-200 space-y-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-xs text-gray-600 uppercase tracking-wide">{TEXTS.admin.campanaDetalle.actions.statusLabel}</span>
-                  <Button
-                    size="sm"
-                    variant={postulacion.estado === 'En revisiÃ³n' ? 'default' : 'outline'}
-                    disabled={updatingId === postulacion.id}
-                    onClick={() => handleUpdateEstado(postulacion.id, 'En revisiÃ³n')}
-                    className={
-                      postulacion.estado === 'En revisiÃ³n'
-                        ? 'h-8 rounded-full bg-yellow-500 text-white hover:bg-yellow-600'
-                        : 'h-8 rounded-full border-yellow-300 text-yellow-700 hover:bg-yellow-50'
-                    }
-                  >
-                    {TEXTS.admin.campanaDetalle.actions.setInReview}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant={postulacion.estado === 'Aceptado' ? 'default' : 'outline'}
-                    disabled={updatingId === postulacion.id}
-                    onClick={() => handleUpdateEstado(postulacion.id, 'Aceptado')}
-                    className={
-                      postulacion.estado === 'Aceptado'
-                        ? 'h-8 rounded-full bg-green-500 text-white hover:bg-green-600'
-                        : 'h-8 rounded-full border-green-300 text-green-700 hover:bg-green-50'
-                    }
-                  >
-                    {TEXTS.admin.campanaDetalle.actions.setAccepted}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant={postulacion.estado === 'Rechazado' ? 'default' : 'outline'}
-                    disabled={updatingId === postulacion.id}
-                    onClick={() => handleUpdateEstado(postulacion.id, 'Rechazado')}
-                    className={
-                      postulacion.estado === 'Rechazado'
-                        ? 'h-8 rounded-full bg-red-500 text-white hover:bg-red-600'
-                        : 'h-8 rounded-full border-red-300 text-red-700 hover:bg-red-50'
-                    }
-                  >
-                    {TEXTS.admin.campanaDetalle.actions.setRejected}
-                  </Button>
+                  <p className="text-sm text-gray-600">{TEXTS.admin.campanaDetalle.actions.statusReadOnlyInfo}</p>
                 </div>
 
                 {(postulacion.estado === 'Aceptado' || postulacion.estado === 'Rechazado') && (
@@ -690,3 +591,4 @@ export function CampanaDetalleView({ campaignId, onBack }: CampanaDetalleViewPro
     </div>
   );
 }
+

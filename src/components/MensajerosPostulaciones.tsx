@@ -178,7 +178,7 @@ export function MensajerosPostulaciones() {
       .on(
         'postgres_changes',
         {
-          event: 'UPDATE',
+          event: '*',
           schema: 'public',
           table: 'postulaciones',
           filter: `user_id=eq.${currentUserId}`,
