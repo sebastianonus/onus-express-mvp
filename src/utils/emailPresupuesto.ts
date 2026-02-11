@@ -1,106 +1,83 @@
-/**
- * Servicio de envío de presupuestos por email
- * 
- * PLACEHOLDER: Frontend limpio sin backend
- * 
- * INTEGRACIÓN FUTURA:
- * - Enviar presupuestos mediante Supabase Edge Function + Resend
- * - Notificar al cliente y a info@onusexpress.com
- */
+import { supabase } from '@/supabase';
 
-interface PresupuestoParams {
-  userEmail: string;
-  userName: string;
-  tarifario: string;
-  desglose: string;
-  total: string;
+export interface PresupuestoItemEmail {
+  nombre: string;
+  cantidad: number;
+  precio: number | string;
 }
 
-/**
- * PLACEHOLDER: Envío de presupuesto por email
- * 
- * INTEGRACIÓN FUTURA:
- * - POST a Edge Function de Supabase
- * - Envío mediante Resend API
- * - Notificación dual (cliente + ONUS)
- */
-export async function enviarPresupuesto(params: PresupuestoParams): Promise<{ success: boolean; message: string }> {
-  const { userEmail, userName, tarifario, total } = params;
+interface EnviarPresupuestoParams {
+  tarifario: string;
+  total: string | number;
+  items: PresupuestoItemEmail[];
+}
 
+const QUEUE_KEY = 'onus_presupuestos_queue';
+
+const pushQueue = (payload: Record<string, unknown>) => {
   try {
-    /**
-     * TODO: Integración con Supabase Edge Function
-     * 
-     * const response = await fetch('YOUR_SUPABASE_EDGE_FUNCTION_URL', {
-     *   method: 'POST',
-     *   headers: {
-     *     'Content-Type': 'application/json',
-     *     'Authorization': `Bearer ${access_token}` // NO anon key
-     *   },
-     *   body: JSON.stringify({
-     *     to: [userEmail, 'info@onusexpress.com'],
-     *     subject: `Presupuesto ONUS Express - ${tarifario}`,
-     *     userName,
-     *     tarifario,
-     *     desglose: params.desglose,
-     *     total
-     *   })
-     * });
-     */
+    const current = JSON.parse(localStorage.getItem(QUEUE_KEY) ?? '[]');
+    const safeCurrent = Array.isArray(current) ? current : [];
+    safeCurrent.push({
+      ...payload,
+      queuedAt: new Date().toISOString(),
+    });
+    localStorage.setItem(QUEUE_KEY, JSON.stringify(safeCurrent));
+  } catch (error) {
+    console.error('Error guardando cola de presupuestos:', error);
+  }
+};
 
-    console.info('Envío de presupuesto pendiente de integración:', {
-      userEmail,
-      userName,
+export async function enviarPresupuestoPorEmail({
+  tarifario,
+  total,
+  items,
+}: EnviarPresupuestoParams): Promise<{ success: boolean; message: string }> {
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const session = sessionData?.session;
+    const user = session?.user;
+
+    if (!session || !user?.email) {
+      return { success: false, message: 'Sin sesión de cliente activa' };
+    }
+
+    const payload = {
+      cliente_nombre:
+        String(user.user_metadata?.nombre ?? '').trim() ||
+        String(user.email).split('@')[0],
+      cliente_email: user.email,
       tarifario,
-      total
+      total,
+      items: (items ?? []).slice(0, 100).map((item) => ({
+        nombre: String(item.nombre ?? '').trim(),
+        cantidad: Number(item.cantidad ?? 0) || 0,
+        precio: item.precio ?? 0,
+      })),
+    };
+
+    const { error } = await supabase.functions.invoke('send-presupuesto-email', {
+      body: payload,
     });
 
-    return {
-      success: true,
-      message: 'Presupuesto registrado (pendiente integración con backend)'
-    };
+    if (error) {
+      pushQueue(payload);
+      return {
+        success: false,
+        message: `No se pudo enviar el email (${error.message}). Se guardó en cola.`,
+      };
+    }
 
+    return { success: true, message: 'Notificación enviada' };
   } catch (error) {
-    console.error('Error en enviarPresupuesto:', error);
+    pushQueue({
+      tarifario,
+      total,
+      items,
+    });
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'Error desconocido'
+      message: error instanceof Error ? error.message : 'Error desconocido',
     };
   }
-}
-
-/**
- * PLACEHOLDER: Obtener email del cliente actual
- * 
- * INTEGRACIÓN FUTURA:
- * - Leer email desde supabase.auth.getUser()
- */
-export function obtenerEmailCliente(): string | null {
-  /**
-   * TODO: Cuando se conecte Supabase Auth:
-   * 
-   * const { data: { user } } = await supabase.auth.getUser();
-   * return user?.email || null;
-   */
-  
-  console.info('Obtención de email pendiente de integración con Supabase Auth');
-  return null;
-}
-
-/**
- * PLACEHOLDER: Obtener nombre del cliente actual
- * 
- * INTEGRACIÓN FUTURA:
- * - Leer nombre desde user_metadata o tabla de clientes
- */
-export function obtenerNombreCliente(): string | null {
-  /**
-   * TODO: Cuando se conecte Supabase Auth:
-   * 
-   * const { data: { user } } = await supabase.auth.getUser();
-   * return user?.user_metadata?.nombre || user?.email || null;
-   */
-  
-  console.info('Obtención de nombre pendiente de integración con Supabase Auth');
-  return null;
 }

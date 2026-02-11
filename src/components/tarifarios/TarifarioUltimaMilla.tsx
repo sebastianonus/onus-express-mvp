@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Truck, Clock, Download, X, RotateCcw, ChevronDown, Zap, Package, MapPin, FileText } from 'lucide-react';
 import { Button } from '../ui/button';
 import { TEXTS } from '@/content/texts';
+import { enviarPresupuestoPorEmail } from '@/utils/emailPresupuesto';
 
 export interface TarifarioUltimaMillaHandle {
   resetear: () => void;
@@ -341,6 +342,42 @@ export const TarifarioUltimaMilla = forwardRef<TarifarioUltimaMillaHandle, Tarif
       const fileName = `tarifario-ultima-milla-2026${slug}.pdf`;
 
       pdf.save(fileName);
+
+      const itemsEmail = [
+        ...state.vehiculosSeleccionados.map((v) => ({
+          nombre: `${v.tipo} - ${v.jornada}`,
+          cantidad: v.cantidad,
+          precio: v.precio,
+        })),
+        ...state.tramosSeleccionados.map((t) => ({
+          nombre: t.nombre,
+          cantidad: 1,
+          precio: t.valor,
+        })),
+        ...state.extrasSeleccionados.map((e) => ({
+          nombre: e.concepto,
+          cantidad: e.cantidad,
+          precio: e.precio,
+        })),
+      ];
+
+      if (state.otrosAjustes.concepto || state.otrosAjustes.valor) {
+        itemsEmail.push({
+          nombre: state.otrosAjustes.concepto || TEXTS.tarifarios.common.otherAdjustments.title,
+          cantidad: 1,
+          precio: state.otrosAjustes.valor || 0,
+        });
+      }
+
+      const emailResult = await enviarPresupuestoPorEmail({
+        tarifario: 'Última Milla',
+        total: calcularTotal(),
+        items: itemsEmail,
+      });
+
+      if (!emailResult.success) {
+        console.error('Error enviando presupuesto por email:', emailResult.message);
+      }
     } catch (error) {
       console.error('Error generando PDF:', error);
       alert(TEXTS.tarifarios.common.alerts.pdfError);

@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Warehouse, Package, Download, X, ChevronDown, Truck, MapPin, Hand, PackageCheck, Send, ClipboardList, FileText, FileCheck } from 'lucide-react';
 import { Button } from '../ui/button';
 import { TEXTS } from '@/content/texts';
+import { enviarPresupuestoPorEmail } from '@/utils/emailPresupuesto';
 
 export interface TarifarioAlmacenLogisticaHandle {
   resetear: () => void;
@@ -511,6 +512,67 @@ export const TarifarioAlmacenLogistica = forwardRef<TarifarioAlmacenLogisticaHan
       const fileName = `tarifario-almacen-logistica-2026${slug}.pdf`;
 
       pdf.save(fileName);
+
+      const itemsEmail = [
+        ...state.almacenajeSeleccionado.map((s) => ({
+          nombre: s.tipo,
+          cantidad: s.cantidad,
+          precio: s.precio,
+        })),
+        ...state.recepcionSeleccionada.map((s) => ({
+          nombre: s.servicio,
+          cantidad: s.cantidad,
+          precio: s.precio,
+        })),
+        ...state.ubicacionSeleccionada.map((s) => ({
+          nombre: s.servicio,
+          cantidad: s.cantidad,
+          precio: s.precio,
+        })),
+        ...state.pickingSeleccionado.map((s) => ({
+          nombre: s.tipo,
+          cantidad: s.cantidad,
+          precio: s.precio,
+        })),
+        ...state.packingSeleccionado.map((s) => ({
+          nombre: s.servicio,
+          cantidad: s.cantidad,
+          precio: s.precio,
+        })),
+        ...state.despachoSeleccionado.map((s) => ({
+          nombre: s.servicio,
+          cantidad: s.cantidad,
+          precio: s.precio,
+        })),
+        ...state.inventariosSeleccionados.map((s) => ({
+          nombre: s.servicio,
+          cantidad: s.cantidad,
+          precio: s.precio,
+        })),
+        ...state.extrasSeleccionados.map((s) => ({
+          nombre: s.concepto,
+          cantidad: s.cantidad,
+          precio: s.precio,
+        })),
+      ];
+
+      if (state.otrosAjustes.concepto || state.otrosAjustes.valor) {
+        itemsEmail.push({
+          nombre: state.otrosAjustes.concepto || TEXTS.tarifarios.common.otherAdjustments.title,
+          cantidad: 1,
+          precio: state.otrosAjustes.valor || 0,
+        });
+      }
+
+      const emailResult = await enviarPresupuestoPorEmail({
+        tarifario: 'Almacén y Logística',
+        total: calcularTotal(),
+        items: itemsEmail,
+      });
+
+      if (!emailResult.success) {
+        console.error('Error enviando presupuesto por email:', emailResult.message);
+      }
     } catch (error) {
       console.error('Error generando PDF:', error);
       alert(TEXTS.tarifarios.common.alerts.pdfError);

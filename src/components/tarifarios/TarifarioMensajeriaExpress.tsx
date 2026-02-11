@@ -14,6 +14,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Download, X, Package, Truck, ChevronDown, Zap, Weight, Ruler, Plus, FileText } from 'lucide-react';
 import { TEXTS } from '@/content/texts';
+import { enviarPresupuestoPorEmail } from '@/utils/emailPresupuesto';
 
 export interface TarifarioMensajeriaExpressHandle {
   resetear: () => void;
@@ -363,6 +364,47 @@ export const TarifarioMensajeriaExpress = forwardRef<TarifarioMensajeriaExpressH
         const fileName = `tarifario-mensajeria-express-2026${slug}.pdf`;
 
         pdf.save(fileName);
+
+        const itemsEmail = [
+          ...state.serviciosSeleccionados.map((s) => ({
+            nombre: `${s.servicio} (${s.peso}kg)`,
+            cantidad: s.cantidad,
+            precio: s.precio,
+          })),
+          ...state.suplementosPeso.map((s) => ({
+            nombre: s.descripcion,
+            cantidad: s.cantidad,
+            precio: s.precio,
+          })),
+          ...state.suplementosDimensiones.map((s) => ({
+            nombre: s.descripcion,
+            cantidad: s.cantidad,
+            precio: s.precio,
+          })),
+          ...state.serviciosAdicionales.map((s) => ({
+            nombre: s.concepto,
+            cantidad: s.cantidad,
+            precio: s.precio,
+          })),
+        ];
+
+        if (state.otrosAjustes.concepto || state.otrosAjustes.valor) {
+          itemsEmail.push({
+            nombre: state.otrosAjustes.concepto || TEXTS.tarifarios.common.otherAdjustments.title,
+            cantidad: 1,
+            precio: state.otrosAjustes.valor || 0,
+          });
+        }
+
+        const emailResult = await enviarPresupuestoPorEmail({
+          tarifario: 'Mensajería Express',
+          total: totalEstimado,
+          items: itemsEmail,
+        });
+
+        if (!emailResult.success) {
+          console.error('Error enviando presupuesto por email:', emailResult.message);
+        }
       } catch (error) {
         console.error('Error generando PDF:', error);
         alert(TEXTS.tarifarios.common.alerts.pdfError);

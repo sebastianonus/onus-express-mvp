@@ -5,9 +5,9 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-const EMAIL_TO = Deno.env.get("EMAIL_TO")!;
-const EMAIL_FROM = Deno.env.get("EMAIL_FROM")!;
-const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")!;
+const EMAIL_TO = Deno.env.get("EMAIL_TO") ?? "info@onusexpress.com";
+const EMAIL_FROM = Deno.env.get("EMAIL_FROM") ?? "ONUS EXPRESS <onboarding@resend.dev>";
+const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") ?? "";
 
 const allowedOrigins = (Deno.env.get("ALLOWED_ORIGINS") ?? "")
   .split(",")
@@ -55,6 +55,13 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({ ok: false, error: "METHOD_NOT_ALLOWED" }),
       { status: 405, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  }
+
+  if (!RESEND_API_KEY) {
+    return new Response(
+      JSON.stringify({ ok: false, error: "RESEND_NOT_CONFIGURED" }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
 
@@ -158,6 +165,8 @@ Deno.serve(async (req) => {
   });
 
   if (!emailResponse.ok) {
+    const resendError = await emailResponse.text().catch(() => "");
+    console.error("Resend error:", resendError);
     return new Response(
       JSON.stringify({ ok: false, error: "EMAIL_SEND_FAILED" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
