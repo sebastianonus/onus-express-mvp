@@ -39,7 +39,7 @@ export async function enviarPresupuestoPorEmail({
     const user = session?.user;
 
     if (!session || !user?.email) {
-      return { success: false, message: 'Sin sesión de cliente activa' };
+      return { success: false, message: 'Sin sesion de cliente activa' };
     }
 
     const payload = {
@@ -56,19 +56,37 @@ export async function enviarPresupuestoPorEmail({
       })),
     };
 
-    const { error } = await supabase.functions.invoke('send-presupuesto-email', {
-      body: payload,
-    });
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+    const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 
-    if (error) {
+    if (!supabaseUrl || !supabaseAnonKey) {
       pushQueue(payload);
       return {
         success: false,
-        message: `No se pudo enviar el email (${error.message}). Se guardó en cola.`,
+        message: 'Configuracion de Supabase incompleta. Se guardo en cola.',
       };
     }
 
-    return { success: true, message: 'Notificación enviada' };
+    const response = await fetch(`${supabaseUrl}/functions/v1/send-presupuesto-email`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: supabaseAnonKey,
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => '');
+      pushQueue(payload);
+      return {
+        success: false,
+        message: `No se pudo enviar el email (${response.status}): ${errorText || 'error desconocido'}. Se guardo en cola.`,
+      };
+    }
+
+    return { success: true, message: 'Notificacion enviada' };
   } catch (error) {
     pushQueue({
       tarifario,
